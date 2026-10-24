@@ -30,9 +30,13 @@ const empty = {
   analysis: null, // { explored_m2, warnings }
 }
 
+// A ?token=... on this page's address is passed on: it's the operator token for the backend, or the drive
+// token for the robot bridge (edge/src/prowl_dashboard_bridge).
 function socketUrl() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${window.location.host}/ws/dashboard`
+  const token = new URLSearchParams(window.location.search).get('token')
+  const query = token ? `?token=${encodeURIComponent(token)}` : ''
+  return `${protocol}//${window.location.host}/ws/dashboard${query}`
 }
 
 export function useProwlLink() {

@@ -6,3 +6,5 @@ log/
 .tmp/
 # the standalone motor_tui tool builds in place
 src/prowl_motor_driver/tools/motor_tui/build/
+# the dashboard bridge's npm packages (npm ci)
+src/prowl_dashboard_bridge/node_modules/

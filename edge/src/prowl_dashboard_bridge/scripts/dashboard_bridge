@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Starts the dashboard bridge. exec, so Ctrl-C and SIGTERM reach node itself, which publishes a stop
+# on /cmd_vel before it exits.
+exec node "$(dirname "$(readlink -f "$0")")/app/bridge/index.js" "$@"
