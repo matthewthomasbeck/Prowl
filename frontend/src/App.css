@@ -1,0 +1,92 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.header h1 {
+  margin: 0;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.demo-banner {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  color: var(--warning);
+}
+
+.layout {
+  display: grid;
+  gap: 16px;
+}
+
+.panel {
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  border: 2px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+}
+
+.camera-placeholder {
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+}
+
+.empty-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Wide screens: map on the left, camera and observations stacked on the right */
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: 2fr 1fr;
+  }
+
+  .map-panel {
+    grid-row: span 2;
+  }
+
+  .map-panel .placeholder {
+    min-height: 480px;
+  }
+}
