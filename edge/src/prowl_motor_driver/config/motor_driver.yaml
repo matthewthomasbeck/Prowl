@@ -1,0 +1,37 @@
+motor_driver:
+  ros__parameters:
+    dry_run: false          # true = run without touching GPIO
+    pwm_frequency: 2000     # Hz; pigpio snaps to its nearest supported rate
+    max_duty: 0.98          # manual recommends staying at or below ~98%
+    loop_rate: 50.0         # Hz
+    cmd_timeout: 0.5        # s without /cmd_vel before motors stop
+    max_accel: 2.0          # duty per second (0 -> full in 0.5 s)
+    wheel_separation: 0.3   # m, left-right distance between wheel centers, TODO: measure
+    wheel_base: 0.3         # m, front-rear distance between axles, TODO: measure
+    max_linear_speed: 1.0   # m/s at full duty, TODO: measure
+
+    # BCM GPIO numbers (physical header pin in comments).
+    # en: -1 means EN is not wired to the Pi and must be held HIGH in hardware.
+    # A positive duty turns a motor clockwise. The two sides are mirror images,
+    # so the left motors are inverted: positive then pushes the robot forward on
+    # every wheel. Flip "inverted" on any wheel that spins backwards when driven forward.
+    front_left:             # left board, channel B
+      en: -1
+      in1: 20               # pin 38
+      in2: 21               # pin 40
+      inverted: true
+    rear_left:              # left board, channel A
+      en: -1
+      in1: 5                # pin 29
+      in2: 6                # pin 31
+      inverted: true
+    front_right:            # right board, channel A
+      en: -1
+      in1: 17               # pin 11
+      in2: 27               # pin 13
+      inverted: false
+    rear_right:             # right board, channel B
+      en: -1
+      in1: 22               # pin 15
+      in2: 23               # pin 16
+      inverted: false
