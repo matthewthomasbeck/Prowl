@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# One command to run the motor driver: starts the dev container, builds the
+# workspace, and opens the motor panel (starts in dry run; L switches to live).
+set -euo pipefail
+
+DEV="$(cd "$(dirname "$0")" && pwd)/docker/dev.sh"
+
+"$DEV" up
+
+# Processes in the container outlive a dropped SSH connection, so an old panel
+# (and the driver it runs) may still be there. Stopping the panel makes it shut
+# its driver down cleanly, which leaves the motors coasting.
+if "$DEV" pgrep -x motor_panel >/dev/null; then
+  read -rp "A motor panel is already running (maybe from a dropped connection). Stop it and open a new one? [y/N] " answer
+  [[ "$answer" == [yY]* ]] || exit 1
+  # If it hasn't exited after 5 s, SIGKILL it; its driver still gets SIGTERM.
+  "$DEV" bash -c 'pkill -x motor_panel
+    for _ in $(seq 50); do pgrep -x motor_panel >/dev/null || exit 0; sleep 0.1; done
+    pkill -KILL -x motor_panel'
+fi
+
+echo "building workspace..."
+if ! out="$("$DEV" colcon build 2>&1)"; then
+  echo "$out"
+  exit 1
+fi
+exec "$DEV" ros2 run prowl_motor_driver motor_panel

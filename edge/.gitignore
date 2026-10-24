@@ -1,0 +1,8 @@
+# colcon build output
+build/
+install/
+log/
+# local scratch space for tests
+.tmp/
+# the standalone motor_tui tool builds in place
+src/prowl_motor_driver/tools/motor_tui/build/
