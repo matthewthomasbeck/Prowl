@@ -1,0 +1,50 @@
+.moon-globe {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The picture area: a solid dark screen, like the exploration map's frame */
+.moon-canvas {
+  width: 100%;
+  max-width: 520px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: #05070a;
+  cursor: grab;
+  touch-action: none; /* lets a finger drag the globe instead of scrolling the page */
+}
+
+.moon-canvas:active {
+  cursor: grabbing;
+}
+
+.moon-loading {
+  position: absolute;
+  top: 45%;
+  color: var(--muted);
+}
+
+.moon-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.moon-controls .button {
+  min-width: 44px;
+}
+
+.moon-zoom {
+  min-width: 54px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.moon-hint {
+  font-size: 12px;
+  text-align: center;
+  color: var(--muted);
+}

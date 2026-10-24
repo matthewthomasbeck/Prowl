@@ -1,0 +1,550 @@
+/* The big map panel is the "game world": a dark floor with its own faint dot grid.
+   The other panels float over its left and right sides on a desktop. */
+/* The big area behind the map is only lightly dimmed, so the photo stays vivid around the map. */
+.map-panel {
+  --panel-fill: rgba(5, 8, 11, 0.22);
+  --glass-dim: 0.5;
+}
+
+.map-stage {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 0;
+}
+
+/* The map is a solid, fully dark "instrument screen". It is deliberately NOT see-through,
+   so the decorative photo never looks like part of the map or the mapped place. */
+.map {
+  --map-ground: #0b0e11;
+  --map-explored: #1e2429;
+
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--map-ratio);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: var(--map-ground);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.55);
+  cursor: grab;
+  touch-action: none; /* lets a finger drag the map instead of scrolling the page */
+}
+
+.map:active {
+  cursor: grabbing;
+}
+
+/* On a laptop-sized screen the map grows to the largest size that fits its panel.
+   100cqw and 100cqh are 100% of the stage's width and height. */
+@media (min-width: 1100px) and (min-height: 620px) {
+  .map-stage {
+    container-type: size;
+  }
+
+  .map {
+    width: min(100cqw, calc(100cqh * var(--map-ratio)));
+  }
+}
+
+.map-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Drawing parts (inside the SVG) */
+.map-ground {
+  fill: var(--map-ground);
+}
+
+/* Dark space around the Moon, seen when you zoom far out */
+.map-space {
+  fill: #05070a;
+}
+
+/* A dashed outline around the survey zone, so you can find it when zoomed out */
+.zone-outline {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The label above the survey zone when zoomed out. Click it to zoom in. */
+.zone-marker {
+  position: absolute;
+  z-index: 2;
+  padding: 3px 9px;
+  transform: translate(-50%, calc(-100% - 6px));
+  border: 1px solid var(--green);
+  border-radius: 0;
+  background: rgba(5, 8, 12, 0.85);
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.zone-marker:hover {
+  background: rgba(5, 8, 12, 1);
+}
+
+.grid-line {
+  stroke: var(--border-strong);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke; /* stays a thin line however far you zoom */
+  opacity: 0.4;
+}
+
+/* A solid dark line under the green dashes, so the path stands out against the light ground */
+.travel-path-casing {
+  fill: none;
+  stroke: rgba(5, 8, 12, 0.85);
+  stroke-width: 5px;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.travel-path {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 2px;
+  stroke-dasharray: 7 5;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+
+/* Frame details */
+.map-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 0 solid var(--green);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.corner-tl {
+  top: 4px;
+  left: 4px;
+  border-width: 2px 0 0 2px;
+}
+
+.corner-tr {
+  top: 4px;
+  right: 4px;
+  border-width: 2px 2px 0 0;
+}
+
+.corner-bl {
+  bottom: 4px;
+  left: 4px;
+  border-width: 0 0 2px 2px;
+}
+
+.corner-br {
+  right: 4px;
+  bottom: 4px;
+  border-width: 0 2px 2px 0;
+}
+
+/* Numbers along the top and left edges: the local grid units */
+.ruler {
+  position: absolute;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: #e6ebef;
+  text-shadow:
+    0 0 3px #000,
+    0 0 3px #000;
+  pointer-events: none;
+}
+
+.ruler-x {
+  top: 6px;
+  transform: translateX(-50%);
+}
+
+.ruler-y {
+  left: 22px;
+  transform: translateY(-50%);
+}
+
+/* Items placed on top of the drawing. left/top come from the component. */
+.map-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  padding: 1px 6px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e6ebef;
+  background: rgba(5, 8, 12, 0.7); /* a small dark tag, so the text reads over any ground */
+  pointer-events: none;
+}
+
+.start-label {
+  transform: translate(-50%, 14px);
+  letter-spacing: 0.08em;
+}
+
+/* The rover: a green dot with a slow ring that pulses outward */
+.robot-marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 2px var(--green);
+}
+
+.robot-marker::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 1.5px solid var(--green);
+  border-radius: 50%;
+  animation: rover-pulse 2.6s ease-out infinite;
+}
+
+@keyframes rover-pulse {
+  from {
+    opacity: 0.7;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+.robot-label {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+/* Sample pins show the sample ID. Amber outline = still needs review. */
+.pin {
+  position: absolute;
+  z-index: 2;
+  min-height: 26px;
+  padding: 2px 8px;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid;
+  border-radius: 0;
+  background: var(--solid);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap; /* a pin near the map's edge must not wrap its text onto two lines */
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    box-shadow 0.2s;
+}
+
+.pin-review {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.pin-reviewed {
+  border-color: var(--border-strong);
+  color: var(--muted);
+}
+
+/* In color-blind mode, pins that still need review also get a dashed outline, so the shape tells them
+   apart from reviewed pins and does not depend on color alone. */
+:root[data-palette='colorblind'] .pin-review {
+  border-style: dashed;
+  border-width: 2px;
+}
+
+/* Obstacle markers: light outline and text, with a warning triangle. Not amber and not green,
+   so they are told apart from samples by shape (the triangle) as well as by color. */
+.pin-obstacle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-color: #f1f4f6;
+  color: #f1f4f6;
+}
+
+.pin-obstacle-cleared {
+  border-color: var(--border-strong);
+  border-style: dotted;
+  color: var(--muted);
+}
+
+.pin:hover {
+  background: #1a2026;
+}
+
+/* The selected pin is filled green and bold, with a soft glow */
+.pin.selected {
+  border-color: var(--green);
+  background: var(--green);
+  color: var(--bg);
+  font-weight: 700;
+  box-shadow: 0 0 12px rgba(var(--green-rgb), 0.45);
+}
+
+/* The targeting frame. Changing left/top is animated, so it glides from pin to pin. */
+.reticle {
+  position: absolute;
+  z-index: 1;
+  width: 86px;
+  height: 48px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition:
+    left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* While you are dragging or zooming the map, the frame must keep up instantly instead of gliding */
+.reticle.no-glide {
+  transition: none;
+}
+
+.reticle-frame {
+  position: absolute;
+  inset: 0;
+  animation: reticle-breathe 2s ease-in-out infinite;
+  filter: drop-shadow(0 0 3px rgba(var(--green-rgb), 0.6));
+}
+
+.reticle-corner {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 0 solid var(--green);
+}
+
+.rc-tl {
+  top: 0;
+  left: 0;
+  border-width: 2px 0 0 2px;
+}
+
+.rc-tr {
+  top: 0;
+  right: 0;
+  border-width: 2px 2px 0 0;
+}
+
+.rc-bl {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 2px 2px;
+}
+
+.rc-br {
+  right: 0;
+  bottom: 0;
+  border-width: 0 2px 2px 0;
+}
+
+@keyframes reticle-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+.reticle-ping {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--green);
+  animation: reticle-ping 0.7s ease-out 1 forwards;
+}
+
+@keyframes reticle-ping {
+  from {
+    opacity: 0.9;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
+@media (max-width: 1099px) {
+  .pin {
+    min-height: 32px;
+  }
+}
+
+/* A bit smaller on phones so neighboring pins do not touch */
+@media (max-width: 480px) {
+  .pin {
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+
+  .reticle {
+    width: 70px;
+    height: 44px;
+  }
+}
+
+/* Zoom buttons in the corner of the map, like a map app */
+.map-zoom {
+  position: absolute;
+  right: 14px;
+  bottom: 34px;
+  z-index: 3;
+  display: grid;
+  gap: 3px;
+}
+
+.map-zoom-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 0;
+  background: rgba(6, 8, 11, 0.92);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.map-zoom-button:hover:not(:disabled) {
+  border-color: var(--green);
+}
+
+.map-zoom-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.map-zoom-text {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.map-zoom-level {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  z-index: 3;
+  width: 32px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* On phones and iPads the map is small, so the buttons sit in a short row along the bottom edge
+   and are big enough to tap, instead of a tall stack that would cover the map. */
+@media (max-width: 1099px) {
+  .map-zoom {
+    display: flex;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .map-zoom-button {
+    width: 40px;
+    height: 36px;
+  }
+
+  .map-zoom-level {
+    right: 12px;
+    bottom: 52px;
+    width: auto;
+  }
+}
+
+/* Compact legend under the map */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  padding: 0;
+  margin: 10px 0 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+}
+
+.swatch-robot {
+  background: var(--green);
+  border-radius: 50%;
+}
+
+.swatch-path {
+  width: 16px;
+  height: 0;
+  border-top: 2px dashed var(--green);
+}
+
+.swatch-zone {
+  border: 1.5px dashed rgba(255, 255, 255, 0.85);
+}
+
+.swatch-obstacle {
+  /* a small white triangle */
+  background: #f1f4f6;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.swatch-review {
+  border: 1.5px solid var(--amber);
+}
+
+:root[data-palette='colorblind'] .swatch-review {
+  border-style: dashed;
+}
+
+.swatch-reviewed {
+  border: 1.5px solid var(--border-strong);
+}
+
+.swatch-selected {
+  background: var(--green);
+}
+
+.map-note {
+  margin-top: 6px;
+  font-size: 11px;
+  text-align: center;
+  color: var(--muted);
+}

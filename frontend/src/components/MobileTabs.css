@@ -1,0 +1,38 @@
+.mobile-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border: 0;
+  background: rgba(7, 10, 13, 0.7); /* no outline, but enough tint that scrolling content never shows through the tabs */
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+.mobile-tab {
+  min-height: 44px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mobile-tab.active {
+  border-bottom-color: var(--green);
+  background: var(--green-dim);
+  color: var(--text);
+}
+
+@media (min-width: 720px) {
+  .mobile-tabs {
+    display: none;
+  }
+}

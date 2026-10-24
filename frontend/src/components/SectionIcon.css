@@ -1,0 +1,18 @@
+.section-icon-plain {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  filter: none;
+}
+
+.section-icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px rgba(var(--green-rgb), 0.5));
+}
