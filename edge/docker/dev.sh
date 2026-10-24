@@ -42,11 +42,20 @@ case "${1:-}" in
     elif exists; then
       "${DOCKER[@]}" start "$CONTAINER" >/dev/null
     else
+      # Sensors, when present: the LD19 LiDAR on the mini UART (GPIO15) and the MPU6050 on I2C bus 1.
+      # Their device nodes belong to the host's dialout and i2c groups.
+      sensors=()
+      for dev in /dev/ttyS0 /dev/i2c-1; do
+        [ -e "$dev" ] && sensors+=(--device "$dev")
+      done
+      i2c_gid="$(getent group i2c | cut -d: -f3)"
+      [ -n "$i2c_gid" ] && sensors+=(--group-add "$i2c_gid")
       # --init so exited ros2 processes get reaped (sleep as PID 1 never does).
       "${DOCKER[@]}" run -d --init --name "$CONTAINER" \
         --network host --ipc host \
         -v "$WS:/ws" \
         -v /usr/include/pigpio.h:/usr/include/pigpio.h:ro \
+        "${sensors[@]}" --group-add dialout \
         "$IMAGE" sleep infinity >/dev/null
     fi
     ;;

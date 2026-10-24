@@ -6,8 +6,8 @@ live map and the robot's position and can drive it. Every piece talks over ROS2 
 | Phase | What | Needs |
 |---|---|---|
 | 0 | Wiring, and giving the container access to the sensors | nothing |
-| 1 | LD19 LiDAR driver, publishing `/scan` | 0 |
-| 2 | MPU6050 IMU driver, publishing `/imu/data_raw` | 0 |
+| 1 | LD19 LiDAR driver, publishing `/scan` (**done**) | 0 |
+| 2 | MPU6050 IMU driver, publishing `/imu/data_raw` (**done**; accel calibration still open, see Phase 2) | 0 |
 | 3 | Mapping with Cartographer, publishing `/map` | 1 and 2 |
 | 4 | Dashboard link over rosbridge | motor parts work now; the map needs 3 |
 
@@ -58,28 +58,28 @@ Neither sensor shares a pin with the motors.
 |---|---|
 | LD19 P5V | 5V (pin 4) |
 | LD19 GND | GND (pin 6) |
-| LD19 Tx | GPIO9, UART4 RX (pin 21) |
+| LD19 Tx | GPIO15, RXD (pin 10) |
 | LD19 PWM | GND (pin 25). The manual says it must be grounded when unused; grounded means its own 10 Hz speed control |
 | MPU6050 VIN | 3.3V (pin 1) |
 | MPU6050 GND | GND (pin 9) |
 | MPU6050 SDA | GPIO2 (pin 3) |
 | MPU6050 SCL | GPIO3 (pin 5) |
 
-The Pi is already set up for this: I2C is on (`/dev/i2c-1`), and UART4 is on (`/dev/ttyAMA4`, from
-`dtoverlay=uart4` in `/boot/firmware/config.txt`). If you use the LD19's USB adapter board instead, the port
-is `/dev/ttyUSB0`.
+This is how the robot is wired now: the LD19 is on the mini UART (`/dev/ttyS0`, enabled by `enable_uart=1`)
+and the MPU6050 on I2C bus 1 (`/dev/i2c-1`). `docker/dev.sh up` already passes both into the container.
 
-1. In `docker/dev.sh`, add these to the `docker run` in `up`, so the container can open the sensors:
-   `--device /dev/ttyAMA4 --device /dev/i2c-1 --group-add dialout --group-add "$(getent group i2c | cut -d: -f3)"`
-2. In `docker/Dockerfile`, add `ros-jazzy-cartographer-ros ros-jazzy-rosbridge-suite i2c-tools` to the
-   `apt-get install` line.
-3. With no live driver running, rebuild and recreate the container:
-   `docker/dev.sh down && docker/dev.sh image && docker/dev.sh up`
-4. Check the IMU: `docker/dev.sh i2cdetect -y 1` should show `68`.
-5. Check the LiDAR: `docker/dev.sh bash -c 'stty -F /dev/ttyAMA4 230400 raw -echo; timeout 2 od -An -tx1 /dev/ttyAMA4 | head'`
+1. Check the IMU: `docker/dev.sh i2cdetect -y 1` should show `68`.
+2. Check the LiDAR: `docker/dev.sh bash -c 'stty -F /dev/ttyS0 230400 raw -echo; timeout 2 od -An -tx1 /dev/ttyS0 | head'`
    should show bytes, with `54 2c` appearing regularly.
+3. Before Phases 3 and 4, add `ros-jazzy-cartographer-ros ros-jazzy-rosbridge-suite` to the `apt-get install`
+   line in `docker/Dockerfile`. Then, with no live driver running, rebuild and recreate the container:
+   `docker/dev.sh down && docker/dev.sh image && docker/dev.sh up`
 
 ## Phase 1: LD19 LiDAR driver (`prowl_ld19_driver`)
+
+**Status: done.** `ld19_node` publishes `/scan` at 10 Hz on the robot with no CRC errors; see the README for how
+to run it. Two things differ from the plan below: the scan uses a negative `angle_increment` (step 4), and the
+LD19 sends about 416 packets a second, not 375 (step 6).
 
 Source: [LD19 Development Manual V2.3](https://www.elecrow.com/download/product/SLD06360F/LD19_Development%20Manual_V2.3.pdf).
 What the driver needs from it:
@@ -106,12 +106,12 @@ What the driver needs from it:
   `end < start`; add 360° to `end` first. (The manual doesn't mention this case.)
 - Angles increase **clockwise**, with 0° at the sensor's front (§4). ROS angles go counter-clockwise, so use
   `−angle`.
-- 4500 measurements per second at about 10 rotations per second gives roughly 450 points per rotation, about
-  0.8° apart. Distance 0 means no return. A white object within 6 m reads an intensity of about 200.
+- Measured on Prowl: about 5000 measurements (416 packets) per second at 10 rotations per second, so roughly
+  500 points per rotation, about 0.7° apart. (The manual's 4500 per second would give 375 packets.) Distance 0 means no return. A white object within 6 m reads an intensity of about 200.
 
 Steps:
 
-1. Open the port (param `port`, default `/dev/ttyAMA4`) with termios: raw mode, 230400, 8N1. Read it in a
+1. Open the port (param `port`, default `/dev/ttyS0`) with termios: raw mode, 230400, 8N1. Read it in a
    background thread.
 2. Write the packet parser as plain C++ with no ROS in it, so it's easy to test. Look for `0x54 0x2C`, collect
    47 bytes, and check the CRC. On a bad CRC, drop one byte and search again, and count the error.
@@ -123,19 +123,46 @@ Steps:
 4. Collect points into one full rotation. When the angle wraps around, publish that rotation as a
    `sensor_msgs/LaserScan`:
    - `frame_id` `laser_link`. Use fixed bins, e.g. 0.5° (720 bins), with `angle_min` 0 and
-     `angle_increment` 2π/720; put each point in the bin for `−angle`.
+     `angle_increment` **−**2π/720, so bin i is sensor angle i × 0.5° clockwise (ROS angle `−angle`). The
+     LD19 spins clockwise, so this keeps the bins in the order they were measured, which is what
+     `time_increment` assumes; Cartographer uses it to correct scans for the robot's motion. A positive
+     increment would list the points backwards in time.
    - Empty bins and distance-0 points are `+inf`. Make `range_min` and `range_max` params; check the LD19
      spec sheet, which gives about 0.02–12 m.
    - `scan_time` = 360 / speed, `time_increment` = `scan_time` / bins, stamp = when the rotation started.
      Fill in `intensities` too.
 5. Params: `port`, `frame_id`, `range_min`, `range_max`, `bins`, and `min_intensity` (drops weak points;
    start at 0). Publish with the default (reliable) QoS so every kind of subscriber can connect.
-6. Every few seconds, log rotations per second, packets per second (should be about 375), and CRC errors.
+6. Every few seconds, log rotations per second, packets per second (about 416), and CRC errors.
 
 **Done when:** the tests pass, `ros2 topic hz /scan` shows about 10 Hz, and a box held in front of the LiDAR
 shows up at angle 0, then moves to +90° when you move it to the LiDAR's left.
 
 ## Phase 2: MPU6050 IMU driver (`prowl_mpu6050_driver`)
+
+**Status: done.** `mpu6050_node` publishes `/imu/data_raw` at 100 Hz on the robot.
+
+Gyro calibration (fixed 2026-10-24): on the first runs the startup calibration rejected the robot as "not
+still", because the spinning LiDAR shakes the board at its 10 Hz rotation rate (X swung by up to ±8 °/s).
+The stillness check now averages the gyro over 0.1 s blocks, one LiDAR rotation, which cancels that
+vibration but not real movement; see the README. On the robot, with the LiDAR spinning, three runs in a row
+were accepted first time: the movement figure was about 0.05 °/s against a limit of 0.3, the bias came out
+at about (−1.88, −1.14, +0.35) °/s and repeated within 0.03 °/s, and the corrected gyro then averaged within
+0.03 °/s of zero. The raw vibration is much smaller now (X noise about 0.25 °/s, a 0.24 °/s peak at
+9.96 Hz), so the mounting looks fine.
+
+Still open:
+
+- **Accelerometer offsets.** Standing still, `|a|` reads 9.11 m/s² instead of 9.81 (about 70 mg low,
+  within the MPU-6050's zero-g offset spec). Finding per-axis offsets needs a six-position calibration,
+  i.e. resting the robot on each side in turn, which wasn't possible yet. Cartographer only uses the
+  direction of gravity, so this doesn't block Phase 3.
+- **Gyro bias drifts with temperature.** Over 3 minutes the chip warmed by 0.7 °C and the Z bias rose by
+  about 0.08 °/s (roughly 0.1 °/s per °C). The bias is only measured at startup, so start the driver once
+  the robot has warmed up, or restart it before a long mapping run. Scan matching corrects slow heading
+  drift.
+- Turning the robot left to check for a positive `angular_velocity.z` (the last "done when" check) still
+  needs the robot moved.
 
 Sources: the [Adafruit MPU6050 guide](https://cdn-learn.adafruit.com/downloads/pdf/mpu6050-6-dof-accelerometer-and-gyro.pdf)
 for the board and wiring, and the InvenSense
