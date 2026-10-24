@@ -4,6 +4,7 @@ import SectionIcon from './SectionIcon.jsx'
 import moonUrl from '../assets/moon-map-2k.jpg'
 import groundUrl from '../assets/moon-ground.jpg'
 import { mapGround } from '../data/backgroundPhoto.js'
+import { labelsFor } from '../live/labels.js'
 
 // ---- How this map works ----
 // The map is a whole flat Moon (the "world"). The made-up survey zone sits on it as a small rectangle.
@@ -55,7 +56,22 @@ function multiples(step, max) {
   return values
 }
 
-function MissionMap({ area, world, zoneName, path, robot, samples, obstacles, selectedId, onSelect }) {
+// scanMap (live only): the robot's LiDAR map as an image placed in local units { href, x, y, width, height }.
+// unitCm (live only): how many centimetres one local grid unit is. labels: wording for the data source.
+function MissionMap({
+  area,
+  world,
+  zoneName,
+  path,
+  robot,
+  samples,
+  obstacles,
+  selectedId,
+  onSelect,
+  scanMap = null,
+  unitCm,
+  labels = labelsFor('demo'),
+}) {
   const items = [...samples, ...obstacles] // anything on the map that can be selected
   const ratio = area.height / area.width // the map box is the same shape as the survey zone
   const fitZoom = world.width / area.width // the zoom where the survey zone exactly fills the screen
@@ -258,7 +274,8 @@ function MissionMap({ area, world, zoneName, path, robot, samples, obstacles, se
   })
   const rulerY = gridYs.filter((y) => {
     const worldY = y + world.missionY
-    return worldY >= view.y && worldY <= view.y + visibleHeight && Math.abs(y - path[0].y) > 6 // not on the "Start" label
+    const start = path[0]
+    return worldY >= view.y && worldY <= view.y + visibleHeight && (!start || Math.abs(y - start.y) > 6) // not on the "Start" label
   })
 
   // Close up, the sharp survey-zone photo fades in over the whole-Moon map (like a map app loading finer tiles).
@@ -288,7 +305,7 @@ function MissionMap({ area, world, zoneName, path, robot, samples, obstacles, se
           <SectionIcon name="map" />
           Exploration map
         </h2>
-        <span className="tag">Simulated map — local coordinates</span>
+        <span className="tag">{labels.mapTag}</span>
       </div>
 
       {/* map-stage gives the map room; --map-ratio keeps the map box the same shape as the survey zone */}
@@ -332,6 +349,19 @@ function MissionMap({ area, world, zoneName, path, robot, samples, obstacles, se
               preserveAspectRatio="none"
               opacity={photoOpacity}
             />
+            {/* The robot's LiDAR map (live only). Bright = something solid, faint green = ground it has seen,
+                see-through = not seen yet. It sits under the zone outline, grid and path. */}
+            {scanMap && (
+              <image
+                className="scan-layer"
+                href={scanMap.href}
+                x={scanMap.x + world.missionX}
+                y={scanMap.y + world.missionY}
+                width={scanMap.width}
+                height={scanMap.height}
+                preserveAspectRatio="none"
+              />
+            )}
             <rect
               className="zone-outline"
               x={world.missionX}
@@ -408,28 +438,32 @@ function MissionMap({ area, world, zoneName, path, robot, samples, obstacles, se
                 </span>
               ))}
 
-              <span className="map-label start-label" style={pointStyle(toWorld(path[0]))}>
-                Start
-              </span>
+              {path.length > 0 && (
+                <span className="map-label start-label" style={pointStyle(toWorld(path[0]))}>
+                  Start
+                </span>
+              )}
 
               <div className="robot-marker" style={pointStyle(toWorld(robot))}>
                 <span className="robot-label">Robot</span>
               </div>
 
               {/* The targeting frame glides to whichever pin is selected. The ping ring replays on each new selection. */}
-              <div
-                className={moving ? 'reticle no-glide' : 'reticle'}
-                style={pointStyle(toWorld(selectedSample))}
-                aria-hidden="true"
-              >
-                <span className="reticle-frame">
-                  <span className="reticle-corner rc-tl"></span>
-                  <span className="reticle-corner rc-tr"></span>
-                  <span className="reticle-corner rc-bl"></span>
-                  <span className="reticle-corner rc-br"></span>
-                </span>
-                <span key={selectedId} className="reticle-ping"></span>
-              </div>
+              {selectedSample && (
+                <div
+                  className={moving ? 'reticle no-glide' : 'reticle'}
+                  style={pointStyle(toWorld(selectedSample))}
+                  aria-hidden="true"
+                >
+                  <span className="reticle-frame">
+                    <span className="reticle-corner rc-tl"></span>
+                    <span className="reticle-corner rc-tr"></span>
+                    <span className="reticle-corner rc-bl"></span>
+                    <span className="reticle-corner rc-br"></span>
+                  </span>
+                  <span key={selectedId} className="reticle-ping"></span>
+                </div>
+              )}
 
               {samples.map((sample) => (
                 <button
@@ -438,7 +472,7 @@ function MissionMap({ area, world, zoneName, path, robot, samples, obstacles, se
                   style={pointStyle(toWorld(sample))}
                   onClick={() => onSelect(sample.id)}
                   aria-pressed={sample.id === selectedId}
-                  aria-label={`${sample.id}: ${sample.title}. Status: ${sample.status}. Simulated and unverified.`}
+                  aria-label={`${sample.id}: ${sample.title}. Status: ${sample.status}. ${labels.pinSuffix}`}
                   tabIndex={onScreen(toWorld(sample)) ? 0 : -1} // a pin hidden off screen must not be tabbed to
                 >
                   {sample.id}
@@ -454,7 +488,7 @@ function MissionMap({ area, world, zoneName, path, robot, samples, obstacles, se
                   style={pointStyle(toWorld(obstacle))}
                   onClick={() => onSelect(obstacle.id)}
                   aria-pressed={obstacle.id === selectedId}
-                  aria-label={`${obstacle.id}: ${obstacle.title}. Status: ${obstacle.status}. Simulated obstacle.`}
+                  aria-label={`${obstacle.id}: ${obstacle.title}. Status: ${obstacle.status}. ${labels.obstaclePinSuffix}`}
                   tabIndex={onScreen(toWorld(obstacle)) ? 0 : -1}
                 >
                   <SectionIcon name="warning" plain />
@@ -516,8 +550,14 @@ function MissionMap({ area, world, zoneName, path, robot, samples, obstacles, se
           <span className="swatch swatch-zone"></span>Survey zone
         </li>
         <li>
-          <span className="swatch swatch-obstacle"></span>Obstacle (simulated)
+          <span className="swatch swatch-obstacle"></span>
+          {labels.legendObstacle}
         </li>
+        {scanMap && (
+          <li>
+            <span className="swatch swatch-lidar"></span>LiDAR map
+          </li>
+        )}
         <li>
           <span className="swatch swatch-review"></span>Needs review
         </li>
@@ -529,8 +569,9 @@ function MissionMap({ area, world, zoneName, path, robot, samples, obstacles, se
         </li>
       </ul>
       <p className="map-note">
+        {scanMap && `The bright outlines and green tint are the LiDAR map. One grid unit is ${unitCm} cm. `}
         Zoomed out: NASA's map of the whole Moon. Close up: {mapGround.description}, {mapGround.credit}. Decorative: the
-        survey zone is fictional and is not a real place on the Moon.
+        survey zone is {scanMap ? 'not shown at its real place on the Moon, and the photo is not where the robot is' : 'fictional and is not a real place on the Moon'}.
       </p>
     </section>
   )

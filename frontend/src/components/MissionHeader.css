@@ -132,6 +132,16 @@
   letter-spacing: 0.04em;
 }
 
+/* Live data: the dot fills in with the accent color (the words still say what is connected) */
+.sim-label.live {
+  border-color: var(--green);
+}
+
+.sim-label.live .sim-icon {
+  border-color: var(--green);
+  background: var(--green);
+}
+
 .sim-icon {
   width: 10px;
   height: 10px;

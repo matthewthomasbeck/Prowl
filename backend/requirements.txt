@@ -1,0 +1,9 @@
+# server
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.5
+
+# tools/fake_robot.py (and handy on the Pi for the bridge node)
+websockets>=12
+numpy>=1.24
+pillow>=10

@@ -526,6 +526,12 @@
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
+/* The LiDAR map: a bright outline over a faint green fill, like on the map */
+.swatch-lidar {
+  border: 1.5px solid #f1f4f6;
+  background: rgba(var(--green-rgb), 0.25);
+}
+
 .swatch-review {
   border: 1.5px solid var(--amber);
 }
@@ -547,4 +553,9 @@
   font-size: 11px;
   text-align: center;
   color: var(--muted);
+}
+
+/* The live LiDAR map image: keep its cells crisp instead of blurring them when zoomed in */
+.scan-layer {
+  image-rendering: pixelated;
 }
