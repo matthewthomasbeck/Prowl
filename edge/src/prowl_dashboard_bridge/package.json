@@ -1,0 +1,22 @@
+{
+  "name": "prowl-dashboard-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebSocket bridge between Prowl's ROS2 topics and the dashboard",
+  "type": "module",
+  "main": "bridge/index.js",
+  "scripts": {
+    "start": "node bridge/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.2.0"
+  },
+  "dependencies": {
+    "rclnodejs": "2.3.0",
+    "ws": "8.22.0"
+  },
+  "allowScripts": {
+    "rclnodejs@2.3.0": true
+  }
+}

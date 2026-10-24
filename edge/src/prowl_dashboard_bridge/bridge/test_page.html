@@ -1,0 +1,370 @@
+<!doctype html>
+<!--
+  Prowl test page: served by the bridge at GET /, for checking the robot without the dashboard.
+  Shows the LiDAR scan, the wheel duties and topic ages, and drives the robot over the same
+  /ws/dashboard protocol the dashboard uses (PROTOCOL.md). No libraries, nothing fetched from outside.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prowl test page</title>
+<style>
+  :root {
+    --bg: #15181c; --panel: #1f2329; --line: #343a42; --text: #e4e7eb; --dim: #8b949e;
+    --ok: #3fb950; --warn: #d29922; --bad: #f85149; --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--bad); margin-right: 6px; }
+  .dot.ok { background: var(--ok); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; padding: 16px; max-width: 1200px; }
+  @media (max-width: 800px) { main { grid-template-columns: minmax(0, 1fr); } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin: 0 0 10px; }
+  canvas { width: 100%; aspect-ratio: 1; display: block; background: #0d1014; border-radius: 6px; touch-action: none; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .muted { color: var(--dim); }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 2px 0; }
+  td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .wheels { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .wheel .bar { position: relative; height: 14px; background: #0d1014; border-radius: 4px; overflow: hidden; }
+  .wheel .fill { position: absolute; top: 0; bottom: 0; background: var(--accent); }
+  .wheel .bar::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--dim); }
+  .wheel .label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+  .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0; }
+  button { font: inherit; color: var(--text); background: #2b3139; border: 1px solid var(--line); border-radius: 6px; padding: 12px 4px; cursor: pointer; user-select: none; touch-action: none; }
+  button.held { background: var(--accent); color: #000; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  #stop { width: 100%; background: var(--bad); color: #fff; font-weight: 700; font-size: 18px; border: none; }
+  #log { font: 12px/1.4 ui-monospace, monospace; color: var(--dim); max-height: 120px; overflow-y: auto; white-space: pre-wrap; }
+  input[type=range] { flex: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Prowl test page</h1>
+  <span><span class="dot" id="conn-dot"></span><span id="conn">connecting…</span></span>
+  <span id="can-drive" class="muted"></span>
+  <span id="driving" class="muted"></span>
+</header>
+<main>
+  <div>
+    <section>
+      <h2>LiDAR <span id="scan-info" class="muted" style="text-transform:none"></span></h2>
+      <canvas id="scan" width="800" height="800"></canvas>
+      <div class="row" style="margin-top:8px">
+        <label for="range">View radius</label>
+        <input type="range" id="range" min="1" max="12" step="1" value="4">
+        <span id="range-label">4 m</span>
+      </div>
+      <p class="muted" style="margin:6px 0 0">Robot-centred, forward is up, rings every metre. Points come from <code>/scan</code>
+        after the bridge places them with <code>/robot_pose</code> (none yet = robot at the origin).</p>
+    </section>
+  </div>
+  <div>
+    <section>
+      <h2>Drive</h2>
+      <div class="row">
+        <label for="speed">Speed</label>
+        <input type="range" id="speed" min="0.1" max="1" step="0.05" value="0.4">
+        <span id="speed-label">40 %</span>
+      </div>
+      <div class="pad">
+        <button data-turn="1">⟲ Q</button>
+        <button data-x="1">▲ W</button>
+        <button data-turn="-1">⟳ E</button>
+        <button data-y="1">◀ A</button>
+        <button data-x="-1">▼ S</button>
+        <button data-y="-1">▶ D</button>
+      </div>
+      <button id="stop">STOP (space)</button>
+      <p class="muted" style="margin:8px 0 0">Hold a button or key to drive: W/S forward/back, A/D strafe, Q/E turn;
+        hold two keys to combine them. Letting go stops. Top speeds are the bridge's <code>linear_speed</code> and <code>angular_speed</code>.</p>
+    </section>
+    <section>
+      <h2>Wheel duties (<code>/motor_status</code>)</h2>
+      <div class="wheels" id="wheels"></div>
+    </section>
+    <section>
+      <h2>Topics (seconds since last message)</h2>
+      <table id="ages"></table>
+    </section>
+    <section>
+      <h2>Log</h2>
+      <div id="log"></div>
+    </section>
+  </div>
+</main>
+<script>
+'use strict'
+
+const $ = (id) => document.getElementById(id)
+const SEND_MS = 100 // drive requests go out 10 times a second while held (PROTOCOL.md)
+const STALE_S = 2
+
+// ---- state ----
+let ws = null
+let canDrive = false
+let pose = null // {x, y, theta} in the map frame, or null before the first one
+let scan = null // {t, points: [[x, y], ...]} in the map frame
+let duties = null
+let wheelNames = ['front_left', 'rear_left', 'front_right', 'rear_right']
+
+function log(text) {
+  const line = `${new Date().toLocaleTimeString()}  ${text}\n`
+  const box = $('log')
+  box.textContent = (line + box.textContent).slice(0, 4000)
+}
+
+// ---- connection ----
+function connect() {
+  // Same host and port the page came from; a ?token= on the page address is passed on.
+  const token = new URLSearchParams(location.search).get('token')
+  const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
+  const url = `${scheme}://${location.host}/ws/dashboard${token ? `?token=${encodeURIComponent(token)}` : ''}`
+  ws = new WebSocket(url)
+  ws.onopen = () => {
+    $('conn-dot').classList.add('ok')
+    $('conn').textContent = 'connected'
+    log('connected')
+  }
+  ws.onclose = () => {
+    $('conn-dot').classList.remove('ok')
+    $('conn').textContent = 'disconnected, retrying…'
+    setCanDrive(false)
+    held.clear()
+    showHeld()
+    setTimeout(connect, 1000)
+  }
+  ws.onmessage = (event) => handle(JSON.parse(event.data))
+}
+
+function send(message) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message))
+}
+
+function handle(message) {
+  switch (message.type) {
+    case 'snapshot': {
+      const latest = message.latest || {}
+      pose = latest.pose
+      scan = latest.scan
+      if (latest.motor_status) showDuties(latest.motor_status)
+      if (latest.status) showStatus(latest.status)
+      setCanDrive(message.can_command)
+      log(`snapshot: session ${message.session.id}`)
+      break
+    }
+    case 'pose': pose = message; break
+    case 'scan': scan = message; break
+    case 'motor_status': showDuties(message); break
+    case 'status': showStatus(message); break
+    case 'error': log(`error${message.for_type ? ` (${message.for_type})` : ''}: ${message.error}`); break
+  }
+}
+
+function setCanDrive(value) {
+  canDrive = value
+  $('can-drive').textContent = value ? 'can drive' : 'watch only (add ?token=… to drive)'
+  document.querySelectorAll('.pad button').forEach((b) => { b.disabled = !value })
+}
+
+// ---- status and wheels ----
+function showStatus(status) {
+  $('driving').textContent = status.driving ? '● someone is driving' : 'idle'
+  $('driving').style.color = status.driving ? 'var(--warn)' : ''
+  const rows = Object.entries(status.topic_age_s || {}).map(([topic, age]) => {
+    const color = age === null ? 'var(--dim)' : age > STALE_S ? 'var(--bad)' : 'var(--ok)'
+    return `<tr><td>${topic}</td><td style="color:${color}">${age === null ? 'never' : age.toFixed(1)}</td></tr>`
+  })
+  rows.push(`<tr><td>dashboards connected</td><td>${status.dashboards}</td></tr>`)
+  $('ages').innerHTML = rows.join('')
+}
+
+function showDuties(message) {
+  wheelNames = message.wheels
+  duties = message.duties
+  drawWheels()
+}
+
+function drawWheels() {
+  // Laid out like the robot from above: front pair on top, left wheels on the left.
+  const order = ['front_left', 'front_right', 'rear_left', 'rear_right']
+  $('wheels').innerHTML = order.map((name) => {
+    const i = wheelNames.indexOf(name)
+    const duty = duties && i >= 0 ? duties[i] : 0
+    const width = Math.min(1, Math.abs(duty)) * 50
+    const left = duty >= 0 ? 50 : 50 - width
+    return `<div class="wheel"><div class="label"><span>${name.replace('_', ' ')}</span><span>${duty.toFixed(2)}</span></div>
+      <div class="bar"><div class="fill" style="left:${left}%;width:${width}%"></div></div></div>`
+  }).join('')
+}
+
+// ---- LiDAR plot ----
+const canvas = $('scan')
+const ctx = canvas.getContext('2d')
+let viewRadius = 4
+
+function drawScan() {
+  const size = canvas.width
+  const half = size / 2
+  const scale = half / viewRadius // pixels per metre
+  ctx.clearRect(0, 0, size, size)
+
+  ctx.strokeStyle = '#2a3038'
+  ctx.lineWidth = 1
+  for (let r = 1; r <= viewRadius; r++) {
+    ctx.beginPath()
+    ctx.arc(half, half, r * scale, 0, 2 * Math.PI)
+    ctx.stroke()
+  }
+  ctx.beginPath()
+  ctx.moveTo(half, 0); ctx.lineTo(half, size)
+  ctx.moveTo(0, half); ctx.lineTo(size, half)
+  ctx.stroke()
+
+  // Points are in the map frame: move them into the robot's frame, then draw forward (+x) up and
+  // left (+y) to the left.
+  const robot = pose || { x: 0, y: 0, theta: 0 }
+  const cos = Math.cos(robot.theta)
+  const sin = Math.sin(robot.theta)
+  let shown = 0
+  if (scan) {
+    ctx.fillStyle = '#ff7b72'
+    for (const [mx, my] of scan.points) {
+      const dx = mx - robot.x
+      const dy = my - robot.y
+      const forward = dx * cos + dy * sin
+      const left = -dx * sin + dy * cos
+      const px = half - left * scale
+      const py = half - forward * scale
+      if (px < 0 || py < 0 || px > size || py > size) continue
+      ctx.fillRect(px - 3, py - 3, 6, 6)
+      shown++
+    }
+  }
+
+  // The robot, pointing forward.
+  ctx.fillStyle = '#58a6ff'
+  ctx.beginPath()
+  ctx.moveTo(half, half - 18)
+  ctx.lineTo(half - 11, half + 12)
+  ctx.lineTo(half + 11, half + 12)
+  ctx.closePath()
+  ctx.fill()
+
+  $('scan-info').textContent = scan ? `· ${scan.points.length} points (${shown} in view)` : '· no scan yet'
+}
+
+$('range').addEventListener('input', (e) => {
+  viewRadius = Number(e.target.value)
+  $('range-label').textContent = `${viewRadius} m`
+})
+
+// ---- driving ----
+// Each held control adds its x/y/turn; the sum, times the speed slider, is what's sent.
+const held = new Map() // control id -> {x, y, turn}
+const KEYS = {
+  KeyW: { x: 1 }, KeyS: { x: -1 }, KeyA: { y: 1 }, KeyD: { y: -1 }, KeyQ: { turn: 1 }, KeyE: { turn: -1 },
+}
+let sendTimer = null
+
+function command() {
+  const speed = Number($('speed').value)
+  const sum = { x: 0, y: 0, turn: 0 }
+  for (const c of held.values()) {
+    sum.x += c.x || 0
+    sum.y += c.y || 0
+    sum.turn += c.turn || 0
+  }
+  const clamp = (v) => Math.max(-1, Math.min(1, v)) * speed
+  return { type: 'drive', x: clamp(sum.x), y: clamp(sum.y), turn: clamp(sum.turn) }
+}
+
+function showHeld() {
+  document.querySelectorAll('.pad button').forEach((b) => b.classList.toggle('held', held.has(b)))
+}
+
+function press(id, control) {
+  if (!canDrive || held.has(id)) return
+  held.set(id, control)
+  showHeld()
+  send(command())
+  if (!sendTimer) sendTimer = setInterval(() => send(command()), SEND_MS)
+}
+
+function release(id) {
+  if (!held.delete(id)) return
+  showHeld()
+  if (held.size === 0) {
+    clearInterval(sendTimer)
+    sendTimer = null
+    send({ type: 'drive', x: 0, y: 0, turn: 0 }) // all zeros on release, so the robot stops at once
+  } else {
+    send(command())
+  }
+}
+
+function releaseAll() {
+  for (const id of [...held.keys()]) release(id)
+}
+
+function stop() {
+  held.clear()
+  showHeld()
+  clearInterval(sendTimer)
+  sendTimer = null
+  send({ type: 'stop' })
+  log('stop sent')
+}
+
+document.querySelectorAll('.pad button').forEach((button) => {
+  const control = {
+    x: Number(button.dataset.x || 0), y: Number(button.dataset.y || 0), turn: Number(button.dataset.turn || 0),
+  }
+  button.addEventListener('pointerdown', (e) => {
+    button.setPointerCapture(e.pointerId)
+    press(button, control)
+  })
+  for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    button.addEventListener(name, () => release(button))
+  }
+  button.addEventListener('contextmenu', (e) => e.preventDefault())
+})
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault()
+    stop()
+  } else if (KEYS[e.code] && !e.repeat) {
+    press(e.code, KEYS[e.code])
+  }
+})
+window.addEventListener('keyup', (e) => {
+  if (KEYS[e.code]) release(e.code)
+})
+// Switching tabs or windows can swallow the key-up, so let go of everything.
+window.addEventListener('blur', releaseAll)
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll() })
+
+$('stop').addEventListener('click', stop)
+$('speed').addEventListener('input', (e) => {
+  $('speed-label').textContent = `${Math.round(e.target.value * 100)} %`
+})
+
+// ---- go ----
+function frame() {
+  drawScan()
+  requestAnimationFrame(frame)
+}
+drawWheels()
+setCanDrive(false)
+connect()
+frame()
+</script>
+</body>
+</html>

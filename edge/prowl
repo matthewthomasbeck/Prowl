@@ -19,6 +19,15 @@ if "$DEV" pgrep -x motor_panel >/dev/null; then
     pkill -KILL -x motor_panel'
 fi
 
+# The dashboard bridge's npm packages aren't kept in git. Install them on the first run, and again
+# whenever the lockfile changes (needs internet).
+if ! "$DEV" bash -c 'cd src/prowl_dashboard_bridge &&
+    [ -e node_modules/rclnodejs/build/Release/rclnodejs.node ] &&
+    [ ! package-lock.json -nt node_modules/.package-lock.json ]'; then
+  echo "installing the dashboard bridge's npm packages..."
+  "$DEV" bash -c 'cd src/prowl_dashboard_bridge && npm ci --no-audit --no-fund'
+fi
+
 echo "building workspace..."
 if ! out="$("$DEV" colcon build 2>&1)"; then
   echo "$out"

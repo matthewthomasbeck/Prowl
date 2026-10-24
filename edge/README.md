@@ -2,8 +2,8 @@
 
 The code that runs on the robot: a Raspberry Pi 4 running ROS2 Jazzy inside Docker. So far that's the
 **motor driver** for the four mecanum wheels, a **terminal control panel** for driving and testing them, and
-the **LD19 LiDAR** and **MPU6050 IMU** drivers. Mapping and the dashboard link come next; see
-[ROADMAP.md](ROADMAP.md).
+the **LD19 LiDAR** and **MPU6050 IMU** drivers, and the **dashboard bridge** that serves the robot's data to
+the dashboard and lets it drive. Mapping comes next; see [ROADMAP.md](ROADMAP.md).
 
 ## What's in this folder
 
@@ -11,13 +11,15 @@ the **LD19 LiDAR** and **MPU6050 IMU** drivers. Mapping and the dashboard link c
 |---|---|
 | `prowl` | One command: starts the dev container, builds the code, opens the motor panel |
 | `CLAUDE.md` | Rules and notes for AI coding agents working in this folder |
-| `docker/Dockerfile` | The ROS2 Jazzy image, plus the pigpio client library and ncurses |
+| `docker/Dockerfile` | The ROS2 Jazzy image, plus the pigpio client library, ncurses and Node.js |
 | `docker/dev.sh` | Manages the container: `image`, `up`, `down`, `shell`, or runs any command inside it |
 | `src/prowl_motor_driver/` | ROS2 package with the motor driver node and the motor panel |
 | `src/prowl_motor_driver/config/motor_driver.yaml` | Pins, wheel directions, speed and safety limits |
 | `src/prowl_motor_driver/tools/motor_tui/` | Older standalone test tool that drives the pins without ROS; the panel replaces it |
 | `src/prowl_ld19_driver/` | ROS2 package with the LD19 LiDAR driver node (`/scan`) and a terminal LiDAR viewer |
 | `src/prowl_mpu6050_driver/` | ROS2 package with the MPU6050 IMU driver node (`/imu/data_raw`) and a terminal IMU monitor |
+| `src/prowl_dashboard_bridge/` | ROS2 node in Node.js: a WebSocket server for the dashboard (map, pose, LiDAR, motors, driving) |
+| `src/prowl_dashboard_bridge/PROTOCOL.md` | The messages the bridge and the dashboard exchange |
 
 ## Hardware
 
@@ -175,6 +177,65 @@ and `docker/dev.sh src/prowl_mpu6050_driver/tui.sh`. Stop the matching node firs
 be opened once, and two IMU readers would steal each other's samples.
 
 Tests (no hardware needed): `docker/dev.sh colcon test && docker/dev.sh colcon test-result --verbose`.
+
+## The dashboard bridge
+
+Package `prowl_dashboard_bridge`, executable `dashboard_bridge`, node name `dashboard_bridge`. It's written in
+Node.js with [rclnodejs](https://github.com/RobotWebTools/rclnodejs) and `ws`, so the frontend team can read
+it. It listens on port 8000 and speaks the same messages as the backend's `/ws/dashboard`, so the dashboard
+works with either. The messages are in [PROTOCOL.md](src/prowl_dashboard_bridge/PROTOCOL.md).
+
+- **To the dashboard:** `/robot_pose`, `/scan` (cut to 180 points, in the map frame), `/map` (as a PNG) and
+  `/motor_status`, each slowed down to a few updates a second.
+- **From the dashboard:** drive requests, which go out on `/cmd_vel`. The robot only moves while they keep
+  coming: 0.3 s after the last one, the bridge sends a stop. One dashboard drives at a time, and anyone can
+  send stop.
+
+Its npm packages live in `src/prowl_dashboard_bridge/node_modules`, which isn't in git. `./prowl` installs
+them on the first run; to do it by hand, `docker/dev.sh bash -c 'cd src/prowl_dashboard_bridge && npm ci'`.
+
+```bash
+docker/dev.sh ros2 launch prowl_dashboard_bridge dashboard_bridge.launch.py
+docker/dev.sh bash -c 'cd src/prowl_dashboard_bridge && npm test'   # unit tests, no ROS needed
+```
+
+### Test page
+
+To check the robot without the dashboard, open `http://<pi address>:8000/` in a browser. The bridge
+serves a small page (`bridge/test_page.html`, no libraries) with the LiDAR scan around the robot, the
+four wheel duties, how long ago each topic last arrived, and hold-to-drive buttons (W/S forward/back,
+A/D strafe, Q/E turn, space stops). It uses the same `/ws/dashboard` messages as the dashboard. Add
+`?token=<drive_token>` to the address if a token is set.
+
+`test_page.launch.py` starts what it needs: the LD19 driver, the motor driver (dry run unless
+`live:=true`) and the bridge. Ctrl-C stops all three.
+
+```bash
+docker/dev.sh ros2 launch prowl_dashboard_bridge test_page.launch.py             # motors in dry run
+docker/dev.sh ros2 launch prowl_dashboard_bridge test_page.launch.py live:=true  # motors really move
+```
+
+To show the robot on the dashboard, put `PROWL_BACKEND=http://<pi address>:8000` in `frontend/.env.local`
+and run `npm run dev` in `frontend/`. Add `?token=<drive_token>` to the page address if a token is set.
+`frontend/src/live/useDrive.js` provides hold-to-drive buttons.
+
+Parameters (`config/dashboard_bridge.yaml`):
+
+| Parameter | Value | Meaning |
+|---|---|---|
+| `host` / `port` | `0.0.0.0` / 8000 | Where it listens |
+| `drive_token` | `""` | Needed to drive; empty means anyone who can reach the port can drive |
+| `linear_speed` / `angular_speed` | 0.3 / 1.0 | Top speeds the dashboard can ask for, m/s and rad/s |
+| `drive_timeout` | 0.3 | Seconds without a drive request before it sends a stop |
+| `mission_name`, `zone` | `Prowl live`, unset | What the dashboard calls the run, and the survey zone `[x, y, width, height]` |
+| `laser_x` / `laser_y` / `laser_yaw` | 0 | Where the LiDAR sits on the robot (TODO: measure) |
+| `max_scan_points`, `pose_rate`, `scan_rate`, `motor_status_rate`, `map_period` | 180, 10, 5, 10 Hz, 1 s | How much goes to the dashboard |
+
+To override one on the command line together with the config file, name the node, as in
+`-p dashboard_bridge:port:=8042`. A plain `-p port:=8042` loses to the file's value.
+
+The bridge publishes `/cmd_vel`, so treat it like the motor panel: with a live motor driver running, a
+dashboard can move the robot. Test with the motor driver in dry run.
 
 ## docker/dev.sh
 

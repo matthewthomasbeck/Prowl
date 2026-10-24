@@ -9,7 +9,7 @@ live map and the robot's position and can drive it. Every piece talks over ROS2 
 | 1 | LD19 LiDAR driver, publishing `/scan` (**done**) | 0 |
 | 2 | MPU6050 IMU driver, publishing `/imu/data_raw` (**done**; accel calibration still open, see Phase 2) | 0 |
 | 3 | Mapping with Cartographer, publishing `/map` | 1 and 2 |
-| 4 | Dashboard link over rosbridge | motor parts work now; the map needs 3 |
+| 4 | Dashboard link through our own bridge (**bridge done**, tested in dry run; see Phase 4) | motor parts work now; the map needs 3 |
 
 Phases 1 and 2 don't depend on each other, so two people can do them at the same time. The motor status and
 drive controls in Phase 4 can start right away.
@@ -17,7 +17,7 @@ drive controls in Phase 4 can start right away.
 Ground rules:
 
 - Our drivers are written from scratch from the datasheets. Don't use or adapt LDRobot's `ldlidar_stl_ros2`
-  or Adafruit's MPU6050 libraries. Existing ROS packages that we use as-is (Cartographer, rosbridge) are fine.
+  or Adafruit's MPU6050 libraries. Existing packages that we use as-is (Cartographer, rclnodejs) are fine.
 - None of this needs an external API (the project limit is 2).
 - ROS conventions (REP 103): x forward, y left, z up, angles counter-clockwise, meters and radians.
 
@@ -29,7 +29,7 @@ flowchart LR
   mpu["MPU6050"] -->|I2C| imu["mpu6050_driver"]
   ld19 -->|"/scan"| carto["Cartographer"]
   imu -->|"/imu/data_raw"| carto
-  carto -->|"/map"| bridge["rosbridge, port 9090"]
+  carto -->|"/map"| bridge["dashboard_bridge, port 8000"]
   carto -->|"TF map → base_link"| pose["robot_pose"]
   pose -->|"/robot_pose"| bridge
   ld19 -->|"/scan"| bridge
@@ -71,7 +71,7 @@ and the MPU6050 on I2C bus 1 (`/dev/i2c-1`). `docker/dev.sh up` already passes b
 1. Check the IMU: `docker/dev.sh i2cdetect -y 1` should show `68`.
 2. Check the LiDAR: `docker/dev.sh bash -c 'stty -F /dev/ttyS0 230400 raw -echo; timeout 2 od -An -tx1 /dev/ttyS0 | head'`
    should show bytes, with `54 2c` appearing regularly.
-3. Before Phases 3 and 4, add `ros-jazzy-cartographer-ros ros-jazzy-rosbridge-suite` to the `apt-get install`
+3. Before Phase 3, add `ros-jazzy-cartographer-ros` to the `apt-get install`
    line in `docker/Dockerfile`. Then, with no live driver running, rebuild and recreate the container:
    `docker/dev.sh down && docker/dev.sh image && docker/dev.sh up`
 
@@ -247,36 +247,34 @@ robot.
 
 ## Phase 4: Dashboard link
 
-The dashboard connects straight to the robot: the browser opens a WebSocket to rosbridge on the Pi. No
-backend is needed.
+The dashboard connects straight to the robot, with no backend in between. This was going to be rosbridge,
+but it's now our own bridge, `prowl_dashboard_bridge`: a ROS2 node written in Node.js (rclnodejs + ws) that
+serves the backend's `/ws/dashboard` protocol on port 8000. Next to rosbridge, it only lets the browser
+drive (with an optional token and speed limits), not publish any topic. It slims the data down on the Pi,
+and the dashboard's existing live code works with it unchanged. Messages:
+[`src/prowl_dashboard_bridge/PROTOCOL.md`](src/prowl_dashboard_bridge/PROTOCOL.md).
 
 Edge side:
 
-1. Add rosbridge to `prowl.launch.py` by including `rosbridge_server`'s `rosbridge_websocket_launch.xml`. It
-   listens on port 9090.
-2. Write a small `robot_pose` node in `prowl_bringup`. Every 0.1 s, it looks up the transform
-   `map → base_link` and publishes it as `/robot_pose` (`geometry_msgs/PoseStamped`), so the dashboard
-   doesn't have to do any transform math.
-3. Add `motor_driver` to the launch file with a `live` argument that defaults to false (dry run).
+1. ~~Bridge node: `/robot_pose`, `/scan`, `/map`, `/motor_status` to the dashboard, drive requests to
+   `/cmd_vel`.~~ Done, tested in dry run.
+2. `/robot_pose`: `prowl_brain` will publish it (`geometry_msgs/PoseStamped` in `map`); it's stubs so far.
+3. Add the bridge, and `motor_driver` with a `live` argument that defaults to false (dry run), to
+   `prowl.launch.py`.
+4. Measure the LiDAR's position on the robot (`laser_x`, `laser_y`, `laser_yaw` in
+   `dashboard_bridge.yaml`), so scan points line up with the map.
+5. Decide who owns `/cmd_vel` when both `prowl_brain` and a dashboard want to drive.
 
 Frontend side (`frontend/`):
 
-1. Run `npm install roslib` (v2.x) and connect to `ws://<pi address>:9090`. Use the connection events to drive
-   the header's Connected/Disconnected status, and hide the demo-mode banner while connected.
-2. Map: subscribe to `/map` at most once a second and draw it on a canvas. Cells are row-major, starting at
-   `info.origin`, `info.resolution` meters per cell. Values are −1 for unknown, 0 for free, 100 for occupied.
-3. Robot: subscribe to `/robot_pose`. Draw a marker at `pose.position`, with heading
-   `yaw = atan2(2(w·z + x·y), 1 − 2(y² + z²))` from `pose.orientation`.
-4. LiDAR: subscribe to `/scan`, throttled to about 5 a second. Point i is at angle
-   `angle_min + i × angle_increment` and distance `ranges[i]`, relative to the robot.
-5. Motor status: `/motor_status` `data` holds four duties, in the order front_left, rear_left, front_right,
-   rear_right.
-6. Driving: while a button or key is held, publish `/cmd_vel` (`linear.x`, `linear.y`, `angular.z`) 10 times
-   a second, and send zeros once on release. The driver stops by itself 0.5 s after messages stop, so a
-   dropped connection also stops the robot.
+1. ~~Hold-to-drive: `src/live/useDrive.js`.~~ Done; it sends drive requests 10 times a second while a
+   button is held and a zero on release. `useProwlLink` passes the page's `?token=` on to the socket.
+2. Point the dashboard at the robot: `PROWL_BACKEND=http://<pi address>:8000` in `frontend/.env.local`.
+3. Add drive buttons with `useDrive`, and show `motor_status` and the `scan` points (`useProwlLink` doesn't
+   keep them yet).
 
-rosbridge has no login, so anyone on the same network can drive the robot. Use a private hotspot for the
-demo, not shared Wi-Fi.
+Without a `drive_token`, anyone on the same network can drive the robot. Set one, and use a private hotspot
+for the demo, not shared Wi-Fi.
 
 **Done when:** the dashboard shows the live map, the robot and the LiDAR points, and can drive the robot.
 
@@ -288,9 +286,9 @@ One launch file runs the whole demo:
 docker/dev.sh ros2 launch prowl_bringup prowl.launch.py live:=true
 ```
 
-It starts both sensor drivers, the static transforms, Cartographer, rosbridge, `robot_pose` and the motor
-driver. `./prowl` still works for motor-only testing. While the launch file's driver is running, the panel
-shows `RUNNING (started outside the panel)` but can still drive.
+It starts both sensor drivers, the static transforms, Cartographer, the dashboard bridge, `robot_pose` and
+the motor driver. `./prowl` still works for motor-only testing. While the launch file's driver is running, the
+panel shows `RUNNING (started outside the panel)` but can still drive.
 
 ## After the hackathon
 
@@ -299,4 +297,4 @@ shows `RUNNING (started outside the panel)` but can still drive.
   the dashboard).
 - Save and reload maps.
 - Add the camera stream (left out for now).
-- Put a login in front of rosbridge, or route the dashboard through `backend/`.
+- Real logins for the dashboard bridge instead of one shared token, or route the dashboard through `backend/`.
