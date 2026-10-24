@@ -1,7 +1,16 @@
 import './MissionHeader.css'
 import SectionIcon from './SectionIcon.jsx'
 
-function MissionHeader({ mission, elapsedText, onOpenGlobe, colorBlind, onToggleColorBlind }) {
+// clockLabel and connection say where the data comes from (demo, simulator or robot); see src/live/labels.js
+function MissionHeader({
+  mission,
+  elapsedText,
+  clockLabel = 'Simulated mission time',
+  connection = { text: 'Simulation — robot not connected', live: false },
+  onOpenGlobe,
+  colorBlind,
+  onToggleColorBlind,
+}) {
   return (
     <header className="topbar">
       <div className="brand">
@@ -18,7 +27,7 @@ function MissionHeader({ mission, elapsedText, onOpenGlobe, colorBlind, onToggle
           <span className="segment-value">{mission.name}</span>
         </p>
         <p className="segment">
-          <span className="segment-label">Simulated mission time</span>
+          <span className="segment-label">{clockLabel}</span>
           <span className="segment-value mono">{elapsedText}</span>
         </p>
         <button className="button header-button" onClick={onOpenGlobe}>
@@ -31,9 +40,9 @@ function MissionHeader({ mission, elapsedText, onOpenGlobe, colorBlind, onToggle
           Color-blind mode
           <span className={colorBlind ? 'switch-state on' : 'switch-state'}>{colorBlind ? 'On' : 'Off'}</span>
         </button>
-        <p className="sim-label">
+        <p className={connection.live ? 'sim-label live' : 'sim-label'} role="status">
           <span className="sim-icon" aria-hidden="true"></span>
-          Simulation — robot not connected
+          {connection.text}
         </p>
       </div>
     </header>

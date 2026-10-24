@@ -2,9 +2,9 @@
 
 The React frontend for **Prowl**, built for GeauxHack (theme: "Life in Space"). Prowl is a small wheeled robot with a camera and LiDAR that scouts possible materials in a mock Moon area. It is styled like a sci-fi exploration game's mission screen. It helps an Earth-side reviewer see what was observed, where it was found, why it might matter for people living off Earth, and what to investigate next.
 
-> **This is a simulation.** The robot is not connected and nothing is sent to Earth. Every map position, sample, time and note is made up. Material names are **simulated and unverified**. There is no backend, API, hardware or live data.
+> **Demo data until a robot connects.** On its own, the dashboard shows made-up data: every map position, sample, time and note is invented, and material names are **simulated and unverified**. When the Prowl backend is running and the rover (or the simulator) connects, the same screens show its live data instead, and every label says where the data comes from. Nothing is ever sent to Earth.
 
-This is the `frontend/` folder of the Prowl team repository. It runs on its own, with made-up data, until it is connected to the robot and backend. The connection method and data formats have not been decided yet, so no address or format is guessed here.
+This is the `frontend/` folder of the Prowl team repository. The backend is in `../backend`, and the message formats are in [../backend/PROTOCOL.md](../backend/PROTOCOL.md). See **Live data** below.
 
 ## Run it
 
@@ -18,6 +18,18 @@ npm run dev
 In Windows PowerShell, if `npm` is blocked by a script policy message, use `npm.cmd run dev` instead.
 
 Open the address it prints (usually http://localhost:5173/). To check the code, run `npm run lint` and `npm run build`.
+
+## Live data
+
+Run the backend and the simulator (see [../backend/README.md](../backend/README.md)), then `npm run dev`. The header changes from "Simulation — robot not connected" to "Simulator connected — live", and:
+
+- **The map** gets the rover's LiDAR map drawn over the ground photo: bright outlines are things the LiDAR hit, a faint green tint is ground it has seen, and see-through means not seen yet. The robot and its traveled path are its real position.
+- **Points of interest** are what the camera flagged (`P-001`, …) and **obstacles** are what the LiDAR outlined (`O-001`, …). Their text says they are detector guesses, never test results.
+- **Review status, notes and "Queue report for Earth review"** are saved on the backend and appear on every open dashboard, during the run and after it. Queued reports say "Saved to mission log", never "Delivered to Earth".
+- **Labels follow the source.** Simulator data says "simulator" everywhere; real rover data says "camera detection" or "LiDAR obstacle". The demo data keeps its "simulated" labels.
+- **When the rover drops**, the header says "offline — showing last data". After the run, it says "Run ended — showing its final data".
+
+During `npm run dev`, `/ws` and `/api` are forwarded to a backend on this computer (`http://localhost:8000`). To use the EC2 server instead, create a file called `.env.local` in this folder containing `PROWL_BACKEND=http://<ec2-public-ip>:8000`. For the demo, the backend serves the built dashboard itself at `http://<ec2-public-ip>:8000/`.
 
 ## Background image and credit
 
@@ -92,7 +104,12 @@ Clicking a pin or a point of interest selects the same sample everywhere. A targ
 
 ```
 src/
-  data/sampleMission.js      All the made-up data. Replace this later with real robot data.
+  data/sampleMission.js      All the made-up data, used until a robot connects
+  live/useProwlLink.js       The WebSocket connection to the backend, and the latest live state
+  live/liveMission.js        Turns live data into the same shapes as sampleMission.js (and the finding text)
+  live/liveMap.js            Recolors the LiDAR map image for the exploration map
+  live/labels.js             The wording for demo, simulator and robot data
+  live/useNow.js             The clock for the live mission time
   data/backgroundPhoto.js    Credit text for the background photo
   assets/                    The background photo and its CREDITS.md
   hooks/useMissionClock.js   The simulated mission clock
@@ -111,7 +128,7 @@ src/
     StatusBadge.jsx          Status label with a symbol, so it never relies on color alone
 ```
 
-Data flow: `App.jsx` holds the state: the list of samples, which sample is selected, the local queue, the phone tab and whether the iPad drawer is open. It passes what each panel needs down as props. When something happens (a click, a typed note, a status change), the panel calls a function that `App.jsx` gave it, `App.jsx` updates its state, and React redraws every panel that uses that data.
+Data flow: `App.jsx` holds the state: the list of samples, which sample is selected, the local queue, the phone tab and whether the iPad drawer is open. When live data is available, `App.jsx` passes that to the panels instead, and review actions are sent to the backend rather than kept on the page. It passes what each panel needs down as props. When something happens (a click, a typed note, a status change), the panel calls a function that `App.jsx` gave it, `App.jsx` updates its state, and React redraws every panel that uses that data.
 
 Look and feel: colors live as variables in `src/index.css`. Green marks the rover and the active selection, and amber marks findings that still need review. The borderless sections use CSS `backdrop-filter` (blur and dim) with a `mask-image` fade (explained in a comment in `App.css`). The map texture is made with an SVG filter, and the small section icons are SVG shapes drawn in code (`SectionIcon.jsx`). The futuristic details are tiny spaced-out labels, outlined uppercase status chips, glowing accent lines and a slow pulse on the simulation dot. The only image files are two real NASA images: the whole-Moon map (page background and globe) and an Apollo 16 photo of lunar ground (under the exploration map).
 
@@ -119,12 +136,14 @@ Look and feel: colors live as variables in `src/index.css`. Green marks the rove
 
 - **Starter (boilerplate):** the project was created from the official Vite React starter (`npm create vite@latest -- --template react`). Its basic files (`index.html`, `vite.config.js`, `src/main.jsx`, `.oxlintrc.json`, and the favicon) come from that starter. Everything else was written for this project.
 - **Libraries:** only React and React DOM, plus Vite and Oxlint for building and checking. There is no UI library and no 3D library.
-- **External APIs:** none. The dashboard calls no outside service. The two NASA images are plain files bundled with the app.
+- **External APIs:** none. The dashboard only talks to the team's own Prowl backend (`../backend`). The two NASA images are plain files bundled with the app.
 - **Images:** two real NASA images, credited on screen and in [src/assets/CREDITS.md](src/assets/CREDITS.md). No images or video were generated by AI.
 - **Design inspiration:** one public design shot was looked at for general mood only (a dark palette, thin lines, spacing). No code, layout or assets from it were copied.
 
 ## AI assistance
 
 **All of the code in this folder is AI-assisted.** An AI coding assistant (Claude Code, by Anthropic) helped write this interface. It wrote and edited the React components, CSS and sample data, and explained the code in small steps. It also viewed one public design shot for general inspiration (a dark charcoal palette, thin technical borders, spacing and hierarchy). No layout, code or images from it were copied, and the game-style layout and animations are original. No images or video were generated. The background and the globe use a real NASA map, and the exploration map uses a real NASA photo. The assistant found them, checked them against NASA's usage guidelines, and cropped and resized the photo (see above). The globe's drawing code was written by the assistant, with no 3D library; everything else is made with React, SVG and CSS. The project owner reviews, runs, edits and explains the code. All data is made up.
+
+The live-data connection (`src/live/`, and the small changes in `App.jsx`, the components and `vite.config.js` that use it) was also written with an AI assistant (Claude, by Anthropic) for the team, along with the backend in `../backend`.
 
 Update this section if the way AI is used changes.

@@ -1,7 +1,7 @@
 import './CameraPanel.css'
 import SectionIcon from './SectionIcon.jsx'
 
-function CameraPanel() {
+function CameraPanel({ message = 'Camera offline — awaiting robot connection.' }) {
   return (
     <section className="panel camera-panel">
       {/* A small empty "screen" with a camera icon drawn in SVG (not an image file) */}
@@ -18,7 +18,7 @@ function CameraPanel() {
           <SectionIcon name="camera" />
           Rover camera
         </h2>
-        <p className="camera-message">Camera offline — awaiting robot connection.</p>
+        <p className="camera-message">{message}</p>
       </div>
     </section>
   )

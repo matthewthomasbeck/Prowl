@@ -1,0 +1,22 @@
+{
+  // F5 starts the backend, the simulated rover and the dashboard (see tasks.json), then opens the dashboard.
+  // The first time, run Terminal > Run Task... > "Prowl: first-time setup" before pressing F5.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "editor-browser",
+      "request": "launch",
+      "name": "Prowl dashboard (with backend + simulator)",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "Prowl: run everything"
+    },
+    {
+      "type": "editor-browser",
+      "request": "launch",
+      "name": "Prowl dashboard (already running)",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend"
+    }
+  ]
+}

@@ -1,19 +1,20 @@
 import './ActivityStrip.css'
 import SectionIcon from './SectionIcon.jsx'
+import { labelsFor } from '../live/labels.js'
 
-function ActivityStrip({ samples, obstacles, queue }) {
+function ActivityStrip({ samples, obstacles, queue, labels = labelsFor('demo') }) {
   // Two kinds of events: samples being found, and reports being queued locally.
   const discoveries = samples.map((sample) => ({
     key: `found-${sample.id}`,
     time: sample.discoveredAt,
-    text: `${sample.id} found: ${sample.title} (simulated)`,
+    text: `${sample.id} found: ${sample.title}${labels.activitySuffix}`,
     flag: null,
   }))
 
   const flagged = obstacles.map((obstacle) => ({
     key: `obstacle-${obstacle.id}`,
     time: obstacle.discoveredAt,
-    text: `${obstacle.id} obstacle flagged: ${obstacle.title} (simulated)`,
+    text: `${obstacle.id} obstacle flagged: ${obstacle.title}${labels.activitySuffix}`,
     flag: null,
   }))
 
@@ -24,7 +25,7 @@ function ActivityStrip({ samples, obstacles, queue }) {
     key: `queued-${index}`,
     time: item.queuedAt,
     text: `${item.sampleId} report queued: ${item.status}${item.note ? ', with note' : ''}`,
-    flag: 'Queued locally — demo only',
+    flag: labels.queuedFlag,
   }))
 
   // Newest first, like a game's event feed: queue activity is always on top.
@@ -37,7 +38,7 @@ function ActivityStrip({ samples, obstacles, queue }) {
           <SectionIcon name="log" />
           Mission activity
         </h2>
-        <span className="tag">Simulated</span>
+        <span className="tag">{labels.activityTag}</span>
       </div>
 
       <ol className="activity-list">

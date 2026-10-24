@@ -2,8 +2,9 @@ import { useRef } from 'react'
 import './FindingsList.css'
 import StatusBadge from './StatusBadge.jsx'
 import SectionIcon from './SectionIcon.jsx'
+import { labelsFor } from '../live/labels.js'
 
-function FindingsList({ samples, obstacles, selectedId, onSelect }) {
+function FindingsList({ samples, obstacles, selectedId, onSelect, labels = labelsFor('demo') }) {
   const needReview = samples.filter((sample) => sample.status !== 'Reviewed').length
   const reviewed = samples.length - needReview
   const newObstacles = obstacles.filter((obstacle) => obstacle.status === 'New').length
@@ -18,7 +19,7 @@ function FindingsList({ samples, obstacles, selectedId, onSelect }) {
         </h2>
         <span className="tag tag-review">{needReview} need review</span>
       </div>
-      <p className="panel-note">Simulated and unverified. Names are guesses, not test results.</p>
+      <p className="panel-note">{labels.findingsNote}</p>
 
       {/* Real progress, counted from the statuses: one segment per sample, lit when it is marked Reviewed */}
       <div className="progress">
@@ -42,7 +43,7 @@ function FindingsList({ samples, obstacles, selectedId, onSelect }) {
         onClick={() => obstacleHeading.current?.scrollIntoView({ block: 'start' })}
       >
         <SectionIcon name="warning" />
-        <span>Obstacles (simulated)</span>
+        <span>{labels.obstaclesJump}</span>
         <span className="obstacle-jump-count">
           {newObstacles} new <span aria-hidden="true">↓</span>
         </span>
@@ -51,6 +52,7 @@ function FindingsList({ samples, obstacles, selectedId, onSelect }) {
       {/* Both lists scroll together inside the panel if there is not enough room */}
       <div className="findings-scroll">
         <ul className="findings-list">
+          {samples.length === 0 && <li className="findings-empty">{labels.emptyFindings}</li>}
           {samples.map((sample) => (
             <li key={sample.id}>
               <button
@@ -74,9 +76,10 @@ function FindingsList({ samples, obstacles, selectedId, onSelect }) {
         <h3 ref={obstacleHeading} className="obstacle-heading field-label">
           <SectionIcon name="warning" />
           Obstacles
-          <span className="obstacle-sim">simulated</span>
+          <span className="obstacle-sim">{labels.obstaclesBadge}</span>
         </h3>
         <ul className="findings-list">
+          {obstacles.length === 0 && <li className="findings-empty">{labels.emptyObstacles}</li>}
           {obstacles.map((obstacle) => (
             <li key={obstacle.id}>
               <button
