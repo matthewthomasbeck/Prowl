@@ -20,6 +20,7 @@ the dashboard and lets it drive. Mapping comes next; see [ROADMAP.md](ROADMAP.md
 | `src/prowl_mpu6050_driver/` | ROS2 package with the MPU6050 IMU driver node (`/imu/data_raw`) and a terminal IMU monitor |
 | `src/prowl_dashboard_bridge/` | ROS2 node in Node.js: a WebSocket server for the dashboard (map, pose, LiDAR, motors, driving) |
 | `src/prowl_dashboard_bridge/PROTOCOL.md` | The messages the bridge and the dashboard exchange |
+| `src/prowl_dashboard_bridge/FRONTEND_HOOKUP.md` | Instructions for hooking the dashboard (`frontend/`) up to the bridge |
 
 ## Hardware
 

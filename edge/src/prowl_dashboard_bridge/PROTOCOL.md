@@ -4,6 +4,7 @@ The bridge (`prowl_dashboard_bridge`) runs on the robot and serves the dashboard
 no backend in between. It speaks a subset of the backend's dashboard protocol (`backend/PROTOCOL.md` in the
 Prowl repo), so the dashboard's live code (`frontend/src/live/useProwlLink.js`) works with either one. It
 adds `motor_status`, plus `drive` and `stop` for driving.
+[FRONTEND_HOOKUP.md](FRONTEND_HOOKUP.md) says what the dashboard needs to change to use them.
 
 Every message is one JSON object with a `"type"`. Units are metres and radians; positions are in the SLAM
 `map` frame; `theta` is 0 along +x, counter-clockwise positive (REP 103).
