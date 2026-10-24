@@ -1,13 +1,10 @@
 import './SampleInspector.css'
 import StatusBadge from './StatusBadge.jsx'
 import SectionIcon from './SectionIcon.jsx'
+import { labelsFor } from '../live/labels.js'
 
-// What the queue area says, depending on whether this sample's report is queued yet.
-const queueMessages = {
-  none: 'Demo only. Adds to a local list. Nothing is sent.',
-  queued: '✓ Queued locally — demo only.',
-  changed: 'Changed since it was queued. Queue the update to include the change. Local only.',
-}
+// What the queue area says (labels.queueMessages), depending on whether this sample's report is queued yet,
+// and on where the data comes from: a local demo list, or the backend's shared mission log.
 
 function SampleInspector({
   sample,
@@ -20,8 +17,10 @@ function SampleInspector({
   onChangeNote,
   onChangeStatus,
   onQueue,
+  labels = labelsFor('demo'),
 }) {
   const isObstacle = sample.kind === 'obstacle'
+  const queueMessages = labels.queueMessages
 
   const queueLabel =
     queueState === 'changed' ? 'Queue updated report for Earth review' : 'Queue report for Earth review'
@@ -51,7 +50,7 @@ function SampleInspector({
             <p className="sample-title">{sample.title}</p>
             <p className="sample-badges">
               <StatusBadge status={sample.status} />
-              <span className="tag">{isObstacle ? 'Simulated obstacle' : 'Simulated · unverified'}</span>
+              <span className="tag">{isObstacle ? labels.obstacleTag : labels.sampleTag}</span>
             </p>
           </div>
 
