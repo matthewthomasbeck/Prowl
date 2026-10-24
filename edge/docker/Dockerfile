@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libpigpiod-if-dev \
       pigpio-tools \
       libncurses-dev \
+      i2c-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Run as the host user so colcon's build/ install/ log/ stay owned by them.

@@ -1,8 +1,9 @@
 # Prowl Edge
 
 The code that runs on the robot: a Raspberry Pi 4 running ROS2 Jazzy inside Docker. So far that's the
-**motor driver** for the four mecanum wheels and a **terminal control panel** for driving and testing them.
-The LiDAR, IMU, mapping and the dashboard link come next; see [ROADMAP.md](ROADMAP.md).
+**motor driver** for the four mecanum wheels, a **terminal control panel** for driving and testing them, and
+the **LD19 LiDAR** and **MPU6050 IMU** drivers. Mapping and the dashboard link come next; see
+[ROADMAP.md](ROADMAP.md).
 
 ## What's in this folder
 
@@ -15,13 +16,16 @@ The LiDAR, IMU, mapping and the dashboard link come next; see [ROADMAP.md](ROADM
 | `src/prowl_motor_driver/` | ROS2 package with the motor driver node and the motor panel |
 | `src/prowl_motor_driver/config/motor_driver.yaml` | Pins, wheel directions, speed and safety limits |
 | `src/prowl_motor_driver/tools/motor_tui/` | Older standalone test tool that drives the pins without ROS; the panel replaces it |
+| `src/prowl_ld19_driver/` | ROS2 package with the LD19 LiDAR driver node (`/scan`) and a terminal LiDAR viewer |
+| `src/prowl_mpu6050_driver/` | ROS2 package with the MPU6050 IMU driver node (`/imu/data_raw`) and a terminal IMU monitor |
 
 ## Hardware
 
 - Raspberry Pi 4 (Raspberry Pi OS bookworm)
 - 2× DBH-12V dual H-bridge boards (DC 5–12 V, 0–30 A), one per side
 - 4× DC motors on mecanum wheels, no encoders
-- Not used yet: LD19 LiDAR and MPU6050 IMU (see the roadmap)
+- LD19 LiDAR on the mini UART (`/dev/ttyS0`) and MPU6050 IMU on I2C bus 1 (`/dev/i2c-1`); wiring is in
+  [ROADMAP.md](ROADMAP.md), Phase 0
 
 Motor wiring, as BCM GPIO number with the physical header pin in brackets. Each H-bridge channel's EN pin
 is held HIGH in hardware rather than wired to the Pi.
@@ -130,6 +134,48 @@ docker/dev.sh ros2 topic pub -r 20 /cmd_vel geometry_msgs/msg/Twist "{linear: {y
 docker/dev.sh ros2 topic echo /motor_status    # strafe left: [-0.5, 0.5, 0.5, -0.5]
 ```
 
+## The sensor drivers
+
+Neither one touches the motors, so they're safe to run any time. Each one reads its sensor on a background
+thread. If the sensor is missing or stops answering, the node keeps retrying every second, so it can start
+before the sensor is plugged in.
+
+```bash
+docker/dev.sh ros2 launch prowl_ld19_driver ld19_driver.launch.py
+docker/dev.sh ros2 launch prowl_mpu6050_driver mpu6050_driver.launch.py
+docker/dev.sh ros2 topic hz /scan            # ~10 Hz
+docker/dev.sh ros2 topic hz /imu/data_raw    # ~100 Hz
+```
+
+| Node | Topic | Type | Notes |
+|---|---|---|---|
+| `ld19_driver` (`ld19_node`) | `/scan` | `sensor_msgs/LaserScan` | One message per rotation, `frame_id` `laser_link`. 720 bins of 0.5°; `angle_min` 0 and `angle_increment` negative, so bin i is i × 0.5° clockwise from the LiDAR's front, in the order it was measured. Empty bins are `+inf`. Stamped at the start of the rotation |
+| `mpu6050_driver` (`mpu6050_node`) | `/imu/data_raw` | `sensor_msgs/Imu` | 100 Hz, `frame_id` `imu_link`. Angular velocity (rad/s, gyro bias removed) and acceleration (m/s², gravity included). No orientation: `orientation_covariance[0]` is −1 |
+
+Parameters are in each package's `config/` folder:
+
+- **LD19** (`ld19_driver.yaml`): `port`, `frame_id`, `range_min`/`range_max` (0.02–12 m), `bins`,
+  `min_intensity`, `stats_period`.
+- **MPU6050** (`mpu6050_driver.yaml`): `bus`, `address`, `frame_id`, `rate`, `accel_range`, `gyro_range`,
+  `dlpf`, `calibration_time`, `calibration_max_stddev`, `vibration_period`, `stats_period`.
+
+Every `stats_period` seconds, each node logs its rates and errors. The LD19 should show about
+10 rotations/s and 416 packets/s.
+
+**Gyro calibration:** for the first 2 s after it starts, the IMU node averages the gyro to find its bias, so
+keep the robot still. Nothing is published until that's done. To tell whether the robot moved, it averages
+the gyro over 0.1 s blocks (`vibration_period`, one LiDAR rotation) and checks that the block averages agree
+to within `calibration_max_stddev` (0.3 °/s). The spinning LiDAR shakes the gyro at 10 Hz, and averaging over
+one rotation cancels that, while turning or bumping the robot doesn't cancel. If the robot moved, it tries
+again, up to 3 times, then uses the last average and logs a warning. The log line after calibration shows
+the bias, the raw noise, and the motion figure that was checked.
+
+**Terminal tools**, which read the sensor directly without ROS: `docker/dev.sh src/prowl_ld19_driver/tui.sh`
+and `docker/dev.sh src/prowl_mpu6050_driver/tui.sh`. Stop the matching node first: the LiDAR port can only
+be opened once, and two IMU readers would steal each other's samples.
+
+Tests (no hardware needed): `docker/dev.sh colcon test && docker/dev.sh colcon test-result --verbose`.
+
 ## docker/dev.sh
 
 ```bash
@@ -186,6 +232,11 @@ docker/dev.sh <cmd>    # run any command inside it, e.g. docker/dev.sh colcon bu
   forward on every wheel.
 - **Motor panel.** Starts and stops the driver; hold-to-drive with strafing; wheel tests; speed control;
   LIVE for one run only. If the panel dies, its driver is stopped automatically.
+- **LD19 and MPU6050 drivers.** Both libraries were written from the LD19 manual and the MPU-6000/6050
+  register map, then wrapped in ROS2 nodes. Checked on the robot: `/scan` at 9.95 Hz with no CRC errors,
+  `/imu/data_raw` at 100 Hz. The gyro calibration now ignores the LiDAR's 10 Hz vibration and passes first
+  time on the robot. The accelerometer reads gravity about 7 % low and needs a six-position calibration
+  (see the roadmap, Phase 2).
 - **Tested.** Each motor was run live on the robot. The mecanum mixing and every panel key were checked in
   dry run. The new wheel directions and strafing still need a live check on the robot.
 

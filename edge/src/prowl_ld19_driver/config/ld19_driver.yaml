@@ -1,0 +1,9 @@
+ld19_driver:
+  ros__parameters:
+    port: /dev/ttyS0        # Pi mini UART; the LD19's Tx goes to GPIO15 (header pin 10)
+    frame_id: laser_link
+    range_min: 0.02         # m, LD19 spec: 0.02-12 m
+    range_max: 12.0         # m
+    bins: 720               # 0.5 deg each; the LD19 gives ~450 points per rotation
+    min_intensity: 0        # 0-255; drop weaker points (a white target within 6 m reads ~200)
+    stats_period: 5.0       # s between rate/CRC log lines, 0 = off

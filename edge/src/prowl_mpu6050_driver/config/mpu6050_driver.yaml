@@ -1,0 +1,13 @@
+mpu6050_driver:
+  ros__parameters:
+    bus: 1                  # /dev/i2c-1: SDA on header pin 3 (GPIO2), SCL on pin 5 (GPIO3)
+    address: 0x68           # 0x69 if AD0 is pulled high
+    frame_id: imu_link
+    rate: 100.0             # Hz, rounded to what SMPLRT_DIV can give
+    accel_range: 4          # g: 2, 4, 8 or 16
+    gyro_range: 500         # deg/s: 250, 500, 1000 or 2000
+    dlpf: 44                # Hz low-pass filter: 260, 184, 94, 44, 21, 10 or 5
+    calibration_time: 2.0   # s of gyro bias averaging at startup, robot still; 0 = skip
+    calibration_max_stddev: 0.3  # deg/s, spread of the vibration_period averages; more means the robot moved, so it retries
+    vibration_period: 0.1   # s, one LiDAR rotation: averaging over it cancels the vibration the LiDAR causes
+    stats_period: 5.0       # s between rate/error log lines, 0 = off
