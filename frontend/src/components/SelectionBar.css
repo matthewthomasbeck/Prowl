@@ -1,0 +1,39 @@
+.selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 10px 14px;
+  border: 0;
+  border-left: 4px solid var(--green); /* the one accent bar that shows which sample is selected */
+  background: rgba(7, 10, 13, 0.5);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+
+.selection-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+.selection-id {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--green);
+  text-shadow: 0 0 10px rgba(var(--green-rgb), 0.5);
+}
+
+.selection-title {
+  color: var(--muted);
+}
+
+/* On a desktop the details are always visible, so this bar is not needed */
+@media (min-width: 1100px) {
+  .selection-bar {
+    display: none;
+  }
+}

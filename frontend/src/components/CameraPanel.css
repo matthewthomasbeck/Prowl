@@ -1,0 +1,42 @@
+.camera-panel {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+/* An empty viewfinder: dashed frame, no picture */
+.camera-screen {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 64px;
+  height: 42px;
+  border: 1px dashed var(--border-strong);
+  /* faint horizontal lines, like an empty screen. There is no picture here. */
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+    var(--bg);
+}
+
+.camera-text .field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.camera-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.camera-message {
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--muted);
+}

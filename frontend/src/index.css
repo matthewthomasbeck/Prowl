@@ -1,11 +1,47 @@
+/* Colors are stored once here as variables, so the whole look can be changed in one place.
+   Green = the rover and the active selection. Amber = findings that still need review.
+   The panels are "smoked glass": dark, see-through, with a thin light edge. */
 :root {
-  --bg: #0b1020;
-  --panel: #131a2e;
-  --border: #2a3350;
-  --text: #e5e7eb;
-  --muted: #9ca3af;
-  --warning: #fbbf24;
-  --warning-bg: rgba(251, 191, 36, 0.1);
+  --bg: #0a0c0e; /* only seen if the photo fails to load */
+  /* How dark the glass is: 0 = fully clear, 1 = solid. Change this one number to adjust every panel. */
+  --glass: 0.14;
+  /* How much the picture behind the glass is dimmed (1 = not at all, 0.5 = half as bright).
+     It lets the glass stay almost clear while keeping bright rocks from washing out the text. */
+  --glass-dim: 0.58;
+  /* How much the photo behind a section is blurred (0px = sharp, 12px = very frosted). */
+  --glass-blur: 2px;
+  /* The thin bright line around each panel. When the glass is almost clear, this is what shows where one section ends. */
+  --edge: rgba(255, 255, 255, 0.5);
+  --panel: rgba(9, 12, 16, var(--glass)); /* the smoked-glass fill */
+  --panel-raised: rgba(255, 255, 255, 0.07); /* rows and fields sitting on the glass */
+  --border: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.3);
+  --text: #f1f4f6;
+  --muted: #b3bdc5;
+  /* The two accent colors, kept as plain numbers (red, green, blue) too, so glows can use them at any
+     see-through level: rgba(var(--green-rgb), 0.5). Color-blind mode swaps these four lines. */
+  --green: #7be3a6;
+  --green-rgb: 123, 227, 166;
+  --amber: #f3bb55;
+  --amber-rgb: 243, 187, 85;
+  --green-dim: rgba(var(--green-rgb), 0.16);
+  --amber-dim: rgba(var(--amber-rgb), 0.16);
+  --solid: #0b0e11; /* fully solid dark, for the map and the pins */
+  --radius: 0;
+  --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
+
+  color-scheme: dark; /* makes built-in controls like the status menu dark too */
+}
+
+/* Color-blind mode. Green and amber can look alike to people with red-green color blindness, so this swaps
+   them for sky blue and orange, which stay easy to tell apart for the common kinds of color blindness
+   (they come from the Okabe-Ito palette, made for this). Other cues, like symbols and dashed outlines,
+   are added in the places that use these colors. */
+:root[data-palette='colorblind'] {
+  --green: #56b4e9; /* sky blue: the robot and the active selection */
+  --green-rgb: 86, 180, 233;
+  --amber: #e69f00; /* orange: findings that need review */
+  --amber-rgb: 230, 159, 0;
 }
 
 * {
@@ -15,6 +51,59 @@
 body {
   margin: 0;
   font-family: system-ui, 'Segoe UI', sans-serif;
-  background: var(--bg);
+  font-size: 15px;
+  line-height: 1.5;
+  background-color: var(--bg);
   color: var(--text);
+}
+
+/* The page background: NASA's map of the whole Moon (credit is in src/assets/CREDITS.md), so the dark
+   seas and craters make it clearly the Moon. A dark layer on top keeps text easy to read.
+   It sits behind everything. It is decoration only: not robot footage and not the mapped location. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(5, 7, 10, 0.4), rgba(5, 7, 10, 0.48)),
+    url('./assets/moon-map-2k.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+button,
+select,
+textarea {
+  font: inherit;
+}
+
+/* Monospace is used only for sample IDs, coordinates and times. */
+.mono {
+  font-family: var(--mono);
+}
+
+/* A strong, always-visible focus ring for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* People who ask their device for less motion get no animations or sliding. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

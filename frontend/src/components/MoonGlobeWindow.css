@@ -1,0 +1,47 @@
+.globe-window {
+  width: min(640px, 94vw);
+  max-height: 94dvh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  overflow: auto;
+}
+
+/* The dimmed page behind the open window */
+.globe-window::backdrop {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.globe-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(8, 11, 15, 0.9);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.globe-body .panel-heading {
+  margin-bottom: 0;
+}
+
+.globe-close {
+  min-height: 36px;
+  padding: 4px 12px;
+}
+
+.globe-note {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.globe-credit {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.globe-credit a {
+  color: var(--text);
+}
