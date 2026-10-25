@@ -1,4 +1,6 @@
 # Prowl
+
+<img src="images/prototype-1.jpg" alt="Robot prototype" width="600">
 <div align="center">
   A Rover designed to help map terrain on the moon.<br><br>
   Developed for the 2026 GeauxHack Hackathon at LSU!
