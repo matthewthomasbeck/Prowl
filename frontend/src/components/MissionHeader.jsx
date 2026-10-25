@@ -2,12 +2,18 @@ import './MissionHeader.css'
 import SectionIcon from './SectionIcon.jsx'
 
 // clockLabel and connection say where the data comes from (demo, simulator or robot); see src/live/labels.js
+// pages (robot only): [{ id, label, icon }], the pages to switch between (map, camera, photos), shown as a row of tabs
+// along the bottom of the header; page is the open one, and onPage(id) opens another. On phones the tabs under the
+// header (MobileTabs) do this instead.
 function MissionHeader({
   mission,
   elapsedText,
   clockLabel = 'Simulated mission time',
   connection = { text: 'Simulation — robot not connected', live: false },
   onOpenGlobe,
+  pages = null,
+  page,
+  onPage,
   colorBlind,
   onToggleColorBlind,
 }) {
@@ -45,6 +51,22 @@ function MissionHeader({
           {connection.text}
         </p>
       </div>
+
+      {pages && (
+        <nav className="page-nav" aria-label="Robot pages">
+          {pages.map((entry) => (
+            <button
+              key={entry.id}
+              className={entry.id === page ? 'page-tab active' : 'page-tab'}
+              onClick={() => onPage(entry.id)}
+              aria-current={entry.id === page ? 'page' : undefined}
+            >
+              <SectionIcon name={entry.icon} />
+              {entry.label}
+            </button>
+          ))}
+        </nav>
+      )}
     </header>
   )
 }

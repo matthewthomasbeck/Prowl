@@ -1,5 +1,5 @@
-# Starts what the bridge's test page (http://<pi>:8000/) needs: the LD19 driver, the motor driver and
-# the bridge. No brain, so nothing else publishes /cmd_vel.
+# Starts what the bridge's test page (http://<pi>:8000/) and the dashboard need: the LD19 driver, the IMU
+# driver, the camera driver, the motor driver and the bridge. Nothing else publishes /cmd_vel.
 #
 #   docker/dev.sh ros2 launch prowl_dashboard_bridge test_page.launch.py             # motors in dry run (default)
 #   docker/dev.sh ros2 launch prowl_dashboard_bridge test_page.launch.py live:=true  # motors really move
@@ -30,6 +30,21 @@ def generate_launch_description():
             executable='ld19_node',
             name='ld19_driver',
             parameters=[config('prowl_ld19_driver', 'ld19_driver.yaml')],
+            output='screen',
+        ),
+        # Keep the robot still for the first 2 s: the IMU driver measures its gyro bias then.
+        Node(
+            package='prowl_mpu6050_driver',
+            executable='mpu6050_node',
+            name='mpu6050_driver',
+            parameters=[config('prowl_mpu6050_driver', 'mpu6050_driver.yaml')],
+            output='screen',
+        ),
+        Node(
+            package='prowl_camera_driver',
+            executable='camera_node',
+            name='camera_driver',
+            parameters=[config('prowl_camera_driver', 'camera_driver.yaml')],
             output='screen',
         ),
         Node(

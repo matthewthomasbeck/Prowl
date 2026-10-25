@@ -89,7 +89,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The buttons in the header: the Moon globe, and the color-blind mode switch */
+/* The buttons in the header: the Moon globe and the color-blind mode switch */
 .header-button {
   display: inline-flex;
   align-items: center;
@@ -101,6 +101,43 @@
 
 .header-button + .header-button {
   margin-left: 8px;
+}
+
+/* The robot's pages: a row of tabs across the bottom of the header, in the style of the map's Map / LiDAR scope
+   switch. The open page is underlined and lit, and marked for screen readers. */
+.page-nav {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 2px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.page-tab:hover {
+  color: var(--text);
+}
+
+.page-tab.active {
+  border-bottom-color: var(--green);
+  background: var(--green-dim);
+  color: var(--text);
 }
 
 /* The small ON / OFF word on the switch. When on it is filled, so the state is clear without color. */
@@ -190,5 +227,10 @@
 
   .header-button + .header-button {
     margin-left: 8px;
+  }
+
+  /* the tabs under the header switch pages on a phone */
+  .page-nav {
+    display: none;
   }
 }

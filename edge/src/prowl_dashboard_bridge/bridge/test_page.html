@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
   Prowl test page: served by the bridge at GET /, for checking the robot without the dashboard.
-  Shows the LiDAR scan, the wheel duties and topic ages, and drives the robot over the same
-  /ws/dashboard protocol the dashboard uses (PROTOCOL.md). No libraries, nothing fetched from outside.
+  Shows the camera, the LiDAR scan, the wheel duties and topic ages, and drives the robot over the same
+  /ws/dashboard protocol the dashboard uses (PROTOCOL.md). The camera comes from /api/camera/.
+  No libraries, nothing fetched from outside.
 -->
 <html lang="en">
 <head>
@@ -42,6 +43,9 @@
   #stop { width: 100%; background: var(--bad); color: #fff; font-weight: 700; font-size: 18px; border: none; }
   #log { font: 12px/1.4 ui-monospace, monospace; color: var(--dim); max-height: 120px; overflow-y: auto; white-space: pre-wrap; }
   input[type=range] { flex: 1; }
+  .camera { width: 100%; aspect-ratio: 16 / 9; display: block; background: #0d1014; border-radius: 6px; object-fit: contain; }
+  #capture { padding: 8px 12px; }
+  #motors { border: 1px solid var(--warn); color: var(--warn); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -53,6 +57,18 @@
 </header>
 <main>
   <div>
+    <section>
+      <h2>Camera <span id="still-info" class="muted" style="text-transform:none"></span></h2>
+      <img id="video" class="camera" alt="Live video from the robot's camera">
+      <div class="row" style="margin-top:8px">
+        <button id="capture">Take photo</button>
+        <span id="capture-status" class="muted"></span>
+      </div>
+      <a id="still-link" target="_blank" hidden><img id="still" class="camera" style="margin-top:8px" alt="The newest full-resolution photo"></a>
+      <p class="muted" style="margin:6px 0 0">Live video from <code>/camera/image_raw/compressed</code>. A photo is a
+        full-resolution still from <code>/camera/capture</code>; the video pauses for about a second while it's taken.
+        Click the photo to open it full size.</p>
+    </section>
     <section>
       <h2>LiDAR <span id="scan-info" class="muted" style="text-transform:none"></span></h2>
       <canvas id="scan" width="800" height="800"></canvas>
@@ -68,10 +84,11 @@
   <div>
     <section>
       <h2>Drive</h2>
+      <p id="motors" hidden></p>
       <div class="row">
         <label for="speed">Speed</label>
-        <input type="range" id="speed" min="0.1" max="1" step="0.05" value="0.4">
-        <span id="speed-label">40 %</span>
+        <input type="range" id="speed" min="0.1" max="1" step="0.05" value="1">
+        <span id="speed-label">100 %</span>
       </div>
       <div class="pad">
         <button data-turn="1">⟲ Q</button>
@@ -83,7 +100,8 @@
       </div>
       <button id="stop">STOP (space)</button>
       <p class="muted" style="margin:8px 0 0">Hold a button or key to drive: W/S forward/back, A/D strafe, Q/E turn;
-        hold two keys to combine them. Letting go stops. Top speeds are the bridge's <code>linear_speed</code> and <code>angular_speed</code>.</p>
+        hold two keys to combine them. Letting go stops. Top speeds are the bridge's <code>linear_speed</code> and <code>angular_speed</code>; 100 % is full motor duty,
+        which is easiest on the wheels.</p>
     </section>
     <section>
       <h2>Wheel duties (<code>/motor_status</code>)</h2>
@@ -155,6 +173,7 @@ function handle(message) {
       scan = latest.scan
       if (latest.motor_status) showDuties(latest.motor_status)
       if (latest.status) showStatus(latest.status)
+      if (latest.camera_still) showStill(latest.camera_still)
       setCanDrive(message.can_command)
       log(`snapshot: session ${message.session.id}`)
       break
@@ -163,6 +182,7 @@ function handle(message) {
     case 'scan': scan = message; break
     case 'motor_status': showDuties(message); break
     case 'status': showStatus(message); break
+    case 'camera_still': showStill(message); break
     case 'error': log(`error${message.for_type ? ` (${message.for_type})` : ''}: ${message.error}`); break
   }
 }
@@ -173,8 +193,52 @@ function setCanDrive(value) {
   document.querySelectorAll('.pad button').forEach((b) => { b.disabled = !value })
 }
 
+// ---- camera ----
+const VIDEO_URL = '/api/camera/video.mjpg'
+
+function startVideo() {
+  $('video').src = `${VIDEO_URL}?${Date.now()}`
+}
+// The stream ends when the bridge restarts; try again.
+$('video').onerror = () => setTimeout(startVideo, 2000)
+startVideo()
+
+function showStill(still) {
+  $('still').src = still.url
+  $('still-link').href = still.url
+  $('still-link').hidden = false
+  const size = still.width ? `${still.width}×${still.height}, ` : ''
+  $('still-info').textContent = `photo: ${size}${Math.round(still.bytes / 1024)} KB, ${new Date(still.t * 1000).toLocaleTimeString()}`
+}
+
+$('capture').onclick = async () => {
+  $('capture').disabled = true
+  $('capture-status').textContent = 'taking a photo…'
+  try {
+    const result = await (await fetch('/api/camera/capture', { method: 'POST' })).json()
+    $('capture-status').textContent = result.ok ? result.message : result.error
+    if (result.ok && result.still) showStill(result.still)
+    if (!result.ok) log(`photo: ${result.error}`)
+  } catch (err) {
+    $('capture-status').textContent = `couldn't reach the bridge: ${err.message}`
+  } finally {
+    $('capture').disabled = false
+  }
+}
+
 // ---- status and wheels ----
+// Why driving might not move the robot (status.motors: 'live', 'dry_run', or null if the motor driver isn't answering)
+function showMotors(motors) {
+  const text = {
+    dry_run: '⚠ Motors in dry run: the wheel duties below change, but the robot won\'t move. Restart the launch with live:=true to drive for real.',
+    null: '⚠ The motor driver isn\'t answering, so driving won\'t move the robot.',
+  }[motors]
+  $('motors').hidden = !text
+  $('motors').textContent = text || ''
+}
+
 function showStatus(status) {
+  if ('motors' in status) showMotors(status.motors)
   $('driving').textContent = status.driving ? '● someone is driving' : 'idle'
   $('driving').style.color = status.driving ? 'var(--warn)' : ''
   const rows = Object.entries(status.topic_age_s || {}).map(([topic, age]) => {

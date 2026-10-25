@@ -1,8 +1,10 @@
 // ---- Honest wording for each data source ----
-// The dashboard can show three kinds of data, and it always says which one it is:
+// The dashboard can show four kinds of data, and it always says which one it is:
 //   demo      - the made-up data in data/sampleMission.js (no backend, or no robot has connected yet)
 //   simulator - live data from the Prowl simulator (backend/tools/fake_robot.py), not a real robot
-//   robot     - live data from the real robot
+//   robot     - live data from the real robot, through the backend
+//   bridge    - live data straight from the real robot's own server (edge/src/prowl_dashboard_bridge). It has
+//               the LiDAR, camera, wheels and IMU, but no detector, no map and no position tracking yet
 // Nothing here ever says a report was delivered to Earth: reports are saved in the mission log only.
 
 const savedQueueMessages = {
@@ -72,6 +74,29 @@ const labels = {
     camera: 'No video in this version. Camera finds appear as points of interest.',
     emptyFindings: 'Nothing found yet. The camera is still looking.',
     emptyObstacles: 'No obstacles mapped yet.',
+  },
+  bridge: {
+    sampleTag: 'Camera detection · unverified',
+    obstacleTag: 'LiDAR obstacle',
+    pinSuffix: 'Camera detection, unverified.',
+    obstaclePinSuffix: 'LiDAR obstacle.',
+    findingsNote: "Connected straight to the robot. It doesn't flag points of interest yet: its photos are on the Photos page.",
+    obstaclesJump: 'Obstacles (LiDAR)',
+    obstaclesBadge: 'LiDAR',
+    activityTag: 'Live',
+    activitySuffix: '',
+    queuedFlag: 'Queued locally',
+    mapTag: 'Position not tracked',
+    legendObstacle: 'Obstacle (LiDAR)',
+    queueMessages: {
+      none: "Adds to a list on this page only. The robot doesn't keep reports. Nothing is sent.",
+      queued: '✓ Queued locally.',
+      changed: 'Changed since it was queued. Queue the update to include the change. Local only.',
+    },
+    clockLabel: 'Time since the robot started',
+    camera: 'Camera offline — awaiting robot connection.',
+    emptyFindings: "None: the robot has no detector yet.",
+    emptyObstacles: 'None flagged: see the LiDAR scope on the map.',
   },
 }
 

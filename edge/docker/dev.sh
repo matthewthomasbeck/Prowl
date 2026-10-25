@@ -50,6 +50,15 @@ case "${1:-}" in
       done
       i2c_gid="$(getent group i2c | cut -d: -f3)"
       [ -n "$i2c_gid" ] && sensors+=(--group-add "$i2c_gid")
+      # The camera (libcamera): the media controller, V4L2 and sub-device nodes of the sensor, the CSI
+      # receiver and the ISP, and the dma-buf heaps its buffers come from, all in the host's video
+      # group. libcamera only lists devices udev has seen, so it also reads the host's udev database.
+      for dev in /dev/media* /dev/video* /dev/v4l-subdev* /dev/dma_heap/*; do
+        [ -c "$dev" ] && sensors+=(--device "$dev")
+      done
+      video_gid="$(getent group video | cut -d: -f3)"
+      [ -n "$video_gid" ] && sensors+=(--group-add "$video_gid")
+      [ -d /run/udev ] && sensors+=(-v /run/udev:/run/udev:ro)
       # --init so exited ros2 processes get reaped (sleep as PID 1 never does).
       "${DOCKER[@]}" run -d --init --name "$CONTAINER" \
         --network host --ipc host \

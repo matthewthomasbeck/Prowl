@@ -1,0 +1,137 @@
+/* The Camera page: the video big on the left, taking photos on the right, in the dashboard's borderless style.
+   On a desktop the page fits the window (like the map page), and the video shrinks to fit rather than scroll. */
+.camera-page {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.camera-view {
+  min-height: 0;
+}
+
+.camera-view .panel-heading h2 {
+  margin-right: auto;
+}
+
+.camera-back {
+  min-height: 32px;
+  padding: 4px 12px;
+}
+
+.camera-rate {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.camera-page-empty {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* The video screen: solid dark like the map, with the same corner brackets. The picture keeps its shape (16:9). */
+.camera-screen-live {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: var(--solid);
+}
+
+.camera-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.camera-side {
+  gap: 10px;
+}
+
+.camera-side .panel-heading {
+  margin-bottom: 2px;
+}
+
+.camera-take {
+  min-height: 44px;
+}
+
+.camera-tag-live {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.camera-overlay {
+  position: absolute;
+  inset: auto 8px 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-strong);
+  background: rgba(5, 8, 12, 0.85);
+  font-size: 12px;
+  color: var(--text);
+}
+
+.camera-capture {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.camera-capture-done {
+  color: var(--green);
+}
+
+.camera-capture-failed {
+  color: var(--amber);
+}
+
+/* The newest photo, with the clipped corner the lists use; it opens the Photos page */
+.camera-newest {
+  display: grid;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  border: 0;
+  background: rgba(232, 236, 238, 0.06);
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+
+.camera-newest:hover {
+  background: rgba(232, 236, 238, 0.12);
+}
+
+.camera-newest img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--solid);
+}
+
+@media (min-width: 900px) {
+  .camera-page {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    align-items: start;
+  }
+}
+
+/* Desktop with a tall enough window: the page fills it, and the video is as big as fits */
+@media (min-width: 1100px) and (min-height: 620px) {
+  .camera-page {
+    align-items: stretch;
+  }
+
+  .camera-screen-live {
+    flex: 1;
+    min-height: 0;
+    aspect-ratio: auto;
+  }
+}

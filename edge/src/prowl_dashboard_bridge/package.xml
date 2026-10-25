@@ -13,10 +13,13 @@
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <!-- Only for launch/test_page.launch.py. -->
+  <exec_depend>prowl_camera_driver</exec_depend>
   <exec_depend>prowl_ld19_driver</exec_depend>
   <exec_depend>prowl_motor_driver</exec_depend>
+  <exec_depend>prowl_mpu6050_driver</exec_depend>
 
   <!-- Also needs Node.js >= 20.20.2 (in the dev image) and its npm packages, installed with `npm ci`
        in this folder (./prowl does that when they're missing). -->

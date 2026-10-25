@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { inflateSync } from 'node:zlib'
-import { mapMessage, motorStatusMessage, poseMessage, scanMessage, yawFromQuaternion } from '../bridge/convert.js'
+import { ImuAverage, mapMessage, motorStatusMessage, motorsMode, poseMessage, scanMessage, yawFromQuaternion } from '../bridge/convert.js'
 
 const header = { stamp: { sec: 100, nanosec: 500000000 }, frame_id: 'map' }
 const close = (actual, expected, tolerance = 1e-3) =>
@@ -114,4 +114,29 @@ test('motor status message', () => {
     wheels,
     duties: [0.5, -0.123, 0, 1],
   })
+})
+
+function imuReading(gyroZ, accelZ, sec) {
+  return {
+    header: { stamp: { sec, nanosec: 0 }, frame_id: 'imu_link' },
+    angular_velocity: { x: 0.01, y: 0, z: gyroZ },
+    linear_acceleration: { x: 0, y: 0.2, z: accelZ },
+  }
+}
+
+test('IMU readings are averaged into one message, then it starts again', () => {
+  const average = new ImuAverage()
+  assert.equal(average.take(), null)
+  average.add(imuReading(0.5, 9.0, 10))
+  average.add(imuReading(1.5, 9.6, 11))
+  assert.deepEqual(average.take(), { type: 'imu', t: 11, gyro: [0.01, 0, 1], accel: [0, 0.2, 9.3], samples: 2 })
+  assert.equal(average.take(), null)
+})
+
+test('motors mode from the motor driver dry_run parameter', () => {
+  assert.equal(motorsMode({ values: [{ type: 1, bool_value: true }] }), 'dry_run')
+  assert.equal(motorsMode({ values: [{ type: 1, bool_value: false }] }), 'live')
+  // a driver without the parameter answers with PARAMETER_NOT_SET (0)
+  assert.equal(motorsMode({ values: [{ type: 0, bool_value: false }] }), null)
+  assert.equal(motorsMode({ values: [] }), null)
 })

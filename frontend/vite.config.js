@@ -1,3 +1,5 @@
+import http from 'node:http'
+import https from 'node:https'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 
@@ -10,8 +12,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const backend = env.PROWL_BACKEND || 'http://localhost:8000'
 
+  // Keeps the connections to the backend (or the robot) open between requests. Without it the proxy closes each one,
+  // and the browser has to open a new connection for every request, e.g. every frame on the robot's Camera page.
+  const agent = new (backend.startsWith('https:') ? https : http).Agent({ keepAlive: true })
+
   const proxy = {
-    '/api': { target: backend, changeOrigin: true },
+    '/api': { target: backend, changeOrigin: true, agent },
     '/ws': { target: backend, ws: true, changeOrigin: true },
   }
 

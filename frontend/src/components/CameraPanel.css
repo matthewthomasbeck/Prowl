@@ -40,3 +40,74 @@
   line-height: 1.35;
   color: var(--muted);
 }
+
+/* ---- Connected to the robot: a way to the Camera page, and the newest photo ---- */
+.camera-panel.camera-robot {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.camera-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.camera-open {
+  padding: 0;
+  cursor: pointer;
+}
+
+.camera-open:hover {
+  border-color: var(--green);
+}
+
+.camera-open:hover .camera-icon {
+  stroke: var(--green);
+}
+
+.camera-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.camera-actions > .button {
+  min-height: 34px;
+  padding: 4px 12px;
+}
+
+/* The newest photo, as a small row like a list entry, with the clipped corner the lists use */
+.camera-thumb {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 10px 3px 3px;
+  border: 0;
+  background: rgba(232, 236, 238, 0.06);
+  color: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+}
+
+.camera-thumb:hover {
+  background: rgba(232, 236, 238, 0.12);
+}
+
+.camera-thumb img {
+  flex: none;
+  width: 48px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid var(--border-strong);
+}
+
+.camera-thumb-text {
+  display: grid;
+}

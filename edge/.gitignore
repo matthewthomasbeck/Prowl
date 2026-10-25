@@ -8,3 +8,5 @@ log/
 src/prowl_motor_driver/tools/motor_tui/build/
 # the dashboard bridge's npm packages (npm ci)
 src/prowl_dashboard_bridge/node_modules/
+# photos the dashboard bridge keeps (photo_dir); they can show people, so they stay off GitHub
+data/

@@ -98,6 +98,23 @@ textarea {
   outline-offset: 2px;
 }
 
+/* ---- Connected straight to the robot (App.jsx sets data-link="robot") ----
+   The robot sends new readings several times a second, and the camera page plays video. Blurring the photo behind
+   every panel (backdrop-filter) makes the browser re-blur the page for each change, and the looping animations
+   make it re-draw all the time, which made the robot's dashboard lag badly while the robot's own test page didn't.
+   So here the glass is a plain, darker tint (the same look, without the blur) and nothing loops. */
+:root[data-link='robot'] {
+  --glass: 0.5;
+}
+
+:root[data-link='robot'] *,
+:root[data-link='robot'] *::before,
+:root[data-link='robot'] *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  animation: none !important;
+}
+
 /* People who ask their device for less motion get no animations or sliding. */
 @media (prefers-reduced-motion: reduce) {
   *,

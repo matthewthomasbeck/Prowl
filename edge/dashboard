@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# One command to put the dashboard on the robot: starts the dev container, builds the workspace and the
+# dashboard (frontend/), serves the dashboard on port 5173, and runs test_page.launch.py (LiDAR, IMU, camera,
+# motor driver and the bridge on port 8000). Ctrl-C stops everything.
+#
+#   ./dashboard             asks whether the motors should be live
+#   ./dashboard --live      motors really move
+#   ./dashboard --dry-run   motors stay still (the wheel readout still responds)
+set -euo pipefail
+
+EDGE="$(cd "$(dirname "$0")" && pwd)"
+FRONTEND="$(cd "$EDGE/../frontend" && pwd)"
+DEV="$EDGE/docker/dev.sh"
+IMAGE=prowl-edge-dev:jazzy
+WEB=prowl-dashboard-web # the container serving the built dashboard
+PORT="${DASHBOARD_PORT:-5173}" # DASHBOARD_PORT=... to serve it elsewhere
+
+DOCKER=(docker)
+docker info >/dev/null 2>&1 || DOCKER=(sudo docker)
+
+live=""
+case "${1:-}" in
+  --live) live=true ;;
+  --dry-run) live=false ;;
+  "") ;;
+  *)
+    sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+    exit 1
+    ;;
+esac
+
+"$DEV" up
+
+# Only one motor driver can run. A motor panel (./prowl) or a launch left over from a dropped connection
+# would fight this one for the motors, so offer to stop it first. Both stop their drivers cleanly.
+if "$DEV" pgrep -x motor_panel >/dev/null; then
+  read -rp "A motor panel (./prowl) is running. Stop it and start the dashboard? [y/N] " answer
+  [[ "$answer" == [yY]* ]] || exit 1
+  "$DEV" bash -c 'pkill -x motor_panel
+    for _ in $(seq 50); do pgrep -x motor_panel >/dev/null || exit 0; sleep 0.1; done
+    pkill -KILL -x motor_panel'
+fi
+# [r] keeps the pattern from matching the bash -c running it
+if "$DEV" pgrep -f '[r]os2 launch prowl_dashboard_bridge' >/dev/null; then
+  read -rp "The robot launch is already running (maybe from a dropped connection). Stop it and start again? [y/N] " answer
+  [[ "$answer" == [yY]* ]] || exit 1
+  "$DEV" bash -c 'pkill -INT -f "[r]os2 launch prowl_dashboard_bridge"
+    for _ in $(seq 100); do pgrep -f "[r]os2 launch prowl_dashboard_bridge" >/dev/null || exit 0; sleep 0.1; done
+    echo "it did not stop within 10 s; stop it by hand" >&2; exit 1'
+fi
+if "$DEV" pgrep -f '[m]otor_driver_node|[b]ridge/index.js' >/dev/null; then
+  echo "A motor driver or dashboard bridge is already running outside a launch. Stop it first:" >&2
+  "$DEV" pgrep -af '[m]otor_driver_node|[b]ridge/index.js' >&2
+  exit 1
+fi
+
+if [ -z "$live" ]; then
+  read -rp "Should the motors really move (live)? [y/N] " answer
+  [[ "$answer" == [yY]* ]] && live=true || live=false
+fi
+
+# The bridge's npm packages aren't kept in git: install them on the first run and when the lockfile changes.
+if ! "$DEV" bash -c 'cd src/prowl_dashboard_bridge &&
+    [ -e node_modules/rclnodejs/build/Release/rclnodejs.node ] &&
+    [ ! package-lock.json -nt node_modules/.package-lock.json ]'; then
+  echo "installing the dashboard bridge's npm packages..."
+  "$DEV" bash -c 'cd src/prowl_dashboard_bridge && npm ci --no-audit --no-fund'
+fi
+
+echo "building the robot workspace..."
+if ! out="$("$DEV" colcon build 2>&1)"; then
+  echo "$out"
+  exit 1
+fi
+
+# The dashboard is built and served from the same image (Node isn't installed on the Pi itself). The built
+# version is much lighter in the browser than `npm run dev`.
+frontend() {
+  "${DOCKER[@]}" run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$FRONTEND:/fe" -w /fe \
+    --entrypoint bash "$IMAGE" -c "$1"
+}
+if [ ! -d "$FRONTEND/node_modules" ] || [ "$FRONTEND/package-lock.json" -nt "$FRONTEND/node_modules/.package-lock.json" ]; then
+  echo "installing the dashboard's npm packages..."
+  frontend 'npm ci --no-audit --no-fund'
+fi
+echo "building the dashboard..."
+if ! out="$(frontend 'npm run build' 2>&1)"; then
+  echo "$out"
+  exit 1
+fi
+
+# vite preview serves the build and forwards /ws and /api to the bridge on this Pi (vite.config.js),
+# whatever frontend/.env.local says.
+"${DOCKER[@]}" rm -f "$WEB" >/dev/null 2>&1 || true
+if ss -ltn | grep -q ":$PORT\b"; then
+  echo "Port $PORT is already in use (an \`npm run dev\` still running?). Stop it first." >&2
+  exit 1
+fi
+"${DOCKER[@]}" run -d --rm --name "$WEB" --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
+  -e PROWL_BACKEND=http://127.0.0.1:8000 -v "$FRONTEND:/fe" -w /fe --entrypoint bash "$IMAGE" \
+  -c "exec npx vite preview --host 0.0.0.0 --port $PORT --strictPort" >/dev/null
+trap '"${DOCKER[@]}" rm -f "$WEB" >/dev/null 2>&1 || true' EXIT
+# Ctrl-C goes to the launch, which stops every node cleanly; this script then cleans up after it.
+trap 'true' INT
+for _ in $(seq 30); do
+  curl -sf -o /dev/null "http://127.0.0.1:$PORT/" && break
+  sleep 0.5
+done
+if ! curl -sf -o /dev/null "http://127.0.0.1:$PORT/"; then
+  echo "The dashboard's web server didn't start:" >&2
+  "${DOCKER[@]}" logs "$WEB" >&2 || true
+  exit 1
+fi
+
+echo
+echo "Dashboard: open one of these on a computer on the same network (or Tailscale):"
+for address in $(hostname -I); do
+  [[ "$address" == *:* || "$address" == 172.17.* ]] && continue # IPv6 and Docker's own network
+  echo "  http://$address:$PORT/"
+done
+if [ "$live" = true ]; then
+  echo "Motors: LIVE. The robot moves when someone drives it."
+else
+  echo "Motors: dry run. Driving won't move the robot (./dashboard --live to drive for real)."
+fi
+echo "Keep the robot still for 2 s while the IMU calibrates. Ctrl-C stops everything."
+echo
+
+"$DEV" ros2 launch prowl_dashboard_bridge test_page.launch.py "live:=$live"

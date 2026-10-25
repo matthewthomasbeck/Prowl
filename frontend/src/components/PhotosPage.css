@@ -1,0 +1,193 @@
+/* The Photos page replaces the dashboard's panels with one wide panel, in the same borderless style */
+.photos-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.photos-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+.photos-panel .panel-heading h2 {
+  margin-right: auto;
+}
+
+.photos-back {
+  min-height: 32px;
+  padding: 4px 12px;
+}
+
+.photos-empty {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.photos-problem {
+  color: var(--amber);
+}
+
+.photo-grid {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  min-height: 0;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+/* Each photo is a tile with the clipped corner the lists use, and a thin bar that lights up on hover */
+.photo-tile {
+  position: relative;
+  display: grid;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: rgba(232, 236, 238, 0.05);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+
+.photo-tile::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  width: 3px;
+  background: var(--border-strong);
+  transition: background 0.2s;
+}
+
+.photo-tile:hover {
+  background: rgba(232, 236, 238, 0.1);
+  transform: translateY(-2px);
+}
+
+.photo-tile:hover::before {
+  background: var(--green);
+  box-shadow: 0 0 10px rgba(var(--green-rgb), 0.6);
+}
+
+.photo-tile img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--solid);
+}
+
+.photo-caption {
+  padding: 6px 10px 7px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- The viewer window, like the Moon globe's ---- */
+.photo-window {
+  width: min(1100px, 96vw);
+  max-height: 96dvh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  overflow: auto;
+}
+
+.photo-window::backdrop {
+  background: rgba(0, 0, 0, 0.78);
+}
+
+.photo-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(8, 11, 15, 0.92);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.photo-body .panel-heading {
+  margin-bottom: 0;
+}
+
+.photo-close {
+  min-height: 36px;
+  padding: 4px 12px;
+}
+
+.photo-frame {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: var(--solid);
+}
+
+.photo-frame img {
+  display: block;
+  width: 100%;
+  max-height: 68dvh;
+  object-fit: contain;
+}
+
+.photo-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 0;
+}
+
+.photo-meta dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+}
+
+.photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Links that look like the other buttons */
+.photo-actions a.button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* Deleting can't be undone, so it is amber and asks first */
+.photo-delete {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.photo-delete:hover:not(:disabled) {
+  border-color: var(--amber);
+  background: var(--amber-dim);
+}
+
+.photo-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+@media (max-width: 719px) {
+  .photo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}

@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>prowl_camera_driver</name>
+  <version>0.1.0</version>
+  <description>ROS2 driver for Prowl's Raspberry Pi Camera Module 3: JPEG video and full-resolution stills through libcamera.</description>
+  <maintainer email="weien.greathouse@gmail.com">Prowl Edge Team</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>pkg-config</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>libcamera</depend>
+  <depend>libturbojpeg</depend>
+
+  <exec_depend>launch_ros</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
