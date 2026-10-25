@@ -1,8 +1,0 @@
-.venv/
-__pycache__/
-*.pyc
-.env
-data/
-dashboard_dist/
-# the repo's root .gitignore hides .env*, but the example is meant to be shared
-!.env.example

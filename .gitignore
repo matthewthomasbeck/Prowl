@@ -1,3 +1,25 @@
-.env*
+# colcon build output (the ROS workspace is edge/)
+/edge/build/
+/edge/install/
+/edge/log/
 
-.DS_Store/
+# npm packages (npm ci) and the built dashboard
+node_modules/
+/frontend/dist/
+
+# Photos the dashboard bridge keeps (photo_dir); they can show people, so they stay off GitHub
+/edge/data/
+
+# Local scratch space for tests (see CLAUDE.md)
+.tmp/
+
+# Local settings, e.g. frontend/.env.local
+.env*
+*.local
+
+# Logs, editors and operating systems
+*.log
+.vscode/
+.idea/
+*.sw?
+.DS_Store
