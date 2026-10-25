@@ -33,7 +33,8 @@ counts from it). `can_command` says whether this connection may drive. `session.
 while the LiDAR, motor driver, IMU or camera sent something in the last `stale_after` (2) seconds; the
 bridge itself being up doesn't count.
 
-Then, at the rates set in `config/dashboard_bridge.yaml` (only when something new came in):
+Then, at the rates set in `edge/src/prowl_dashboard_bridge/config/dashboard_bridge.yaml` (only when something
+new came in):
 
 | type | from | default rate | shape |
 |---|---|---|---|
