@@ -78,5 +78,3 @@ The dashboard is connected through a ROS2 wrapper for Node.js, which allows it t
 
 # AI assistance
 Significant portions of the edge code and other documents in the repo were written with help from an AI coding assistant (Claude Code, by Anthropic) during the hackathon, with team members directing the work and testing it on the robot. No code was copied or adapted from other projects; the drivers are written from the hardware datasheets and API documentation.
-
-Keep this section up to date as the project changes.
