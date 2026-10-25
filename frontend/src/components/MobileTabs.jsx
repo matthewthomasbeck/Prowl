@@ -7,10 +7,12 @@ const tabs = [
 ]
 
 // Only shown on phones. It decides which part of the dashboard is on screen.
-function MobileTabs({ activeTab, onChange }) {
+// extraTabs (robot only): more tabs after these, for the robot's own pages, e.g. [{ id: 'camera', label: 'Camera' }].
+function MobileTabs({ activeTab, onChange, extraTabs = [] }) {
+  const shown = [...tabs, ...extraTabs]
   return (
-    <nav className="mobile-tabs" aria-label="Dashboard sections">
-      {tabs.map((tab) => (
+    <nav className="mobile-tabs" aria-label="Dashboard sections" data-count={shown.length}>
+      {shown.map((tab) => (
         <button
           key={tab.id}
           className={tab.id === activeTab ? 'mobile-tab active' : 'mobile-tab'}

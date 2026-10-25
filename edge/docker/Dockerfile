@@ -6,11 +6,17 @@ FROM ros:jazzy-ros-base
 # ncurses for the motor panel.
 # Ubuntu's libpigpiod-if-dev ships pigpiod_if2.h without the pigpio.h it includes,
 # so dev.sh mounts the host's copy (from Raspberry Pi OS's pigpio package).
+# libcamera (with the Raspberry Pi pipeline and the IMX708 tuning files in libcamera-ipa) and
+# TurboJPEG for the camera driver; libcamera-tools gives `cam -l` for checking the camera.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libpigpiod-if-dev \
       pigpio-tools \
       libncurses-dev \
       i2c-tools \
+      libcamera-dev \
+      libcamera-ipa \
+      libcamera-tools \
+      libturbojpeg0-dev \
       curl \
       xz-utils \
     && rm -rf /var/lib/apt/lists/*

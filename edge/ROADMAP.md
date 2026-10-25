@@ -1,23 +1,23 @@
 # Prowl Edge Roadmap
 
-**Goal:** Prowl drives around a room and maps it with its LiDAR, and the dashboard (`frontend/`) shows the
-live map and the robot's position and can drive it. Every piece talks over ROS2 topics.
+**Goal:** Prowl drives around while the dashboard (`frontend/`) shows what its LiDAR, IMU and camera see
+and what its motors are doing, and can drive it. Every piece talks over ROS2 topics.
 
 | Phase | What | Needs |
 |---|---|---|
 | 0 | Wiring, and giving the container access to the sensors | nothing |
 | 1 | LD19 LiDAR driver, publishing `/scan` (**done**) | 0 |
 | 2 | MPU6050 IMU driver, publishing `/imu/data_raw` (**done**; accel calibration still open, see Phase 2) | 0 |
-| 3 | Mapping with Cartographer, publishing `/map` | 1 and 2 |
-| 4 | Dashboard link through our own bridge (**bridge done**, tested in dry run; see Phase 4) | motor parts work now; the map needs 3 |
+| 3 | Dashboard link through our own bridge (**bridge done**, tested in dry run; see Phase 3) | motor parts work now; the sensor data needs 1, 2 and 4 |
+| 4 | Camera Module 3 driver: JPEG video on `/camera/image_raw/compressed`, photos on request (**done**) | nothing |
 
 Phases 1 and 2 don't depend on each other, so two people can do them at the same time. The motor status and
-drive controls in Phase 4 can start right away.
+drive controls in Phase 3 can start right away.
 
 Ground rules:
 
 - Our drivers are written from scratch from the datasheets. Don't use or adapt LDRobot's `ldlidar_stl_ros2`
-  or Adafruit's MPU6050 libraries. Existing packages that we use as-is (Cartographer, rclnodejs) are fine.
+  or Adafruit's MPU6050 libraries. Existing packages that we use as-is (such as rclnodejs) are fine.
 - None of this needs an external API (the project limit is 2).
 - ROS conventions (REP 103): x forward, y left, z up, angles counter-clockwise, meters and radians.
 
@@ -27,12 +27,11 @@ Ground rules:
 flowchart LR
   lidar["LD19 LiDAR"] -->|UART| ld19["ld19_driver"]
   mpu["MPU6050"] -->|I2C| imu["mpu6050_driver"]
-  ld19 -->|"/scan"| carto["Cartographer"]
-  imu -->|"/imu/data_raw"| carto
-  carto -->|"/map"| bridge["dashboard_bridge, port 8000"]
-  carto -->|"TF map → base_link"| pose["robot_pose"]
-  pose -->|"/robot_pose"| bridge
-  ld19 -->|"/scan"| bridge
+  ld19 -->|"/scan"| bridge["dashboard_bridge, port 8000"]
+  imu -.->|"/imu/data_raw (not forwarded yet)"| bridge
+  cam["Camera Module 3"] -->|CSI| camera["camera_driver"]
+  camera -->|"/camera/image_raw/compressed, /camera/still/compressed"| bridge
+  bridge -->|"/camera/capture"| camera
   motor["motor_driver"] -->|"/motor_status"| bridge
   bridge -->|"/cmd_vel"| motor
   bridge <-->|WebSocket| dash["Dashboard (frontend/)"]
@@ -40,15 +39,19 @@ flowchart LR
 
 | Topic | Type | Published by | Used by |
 |---|---|---|---|
-| `/scan` | `sensor_msgs/LaserScan` | ld19_driver | Cartographer, dashboard |
-| `/imu/data_raw` | `sensor_msgs/Imu` | mpu6050_driver | Cartographer |
-| `/map` | `nav_msgs/OccupancyGrid` | Cartographer | dashboard |
-| `/robot_pose` | `geometry_msgs/PoseStamped` | robot_pose | dashboard |
+| `/scan` | `sensor_msgs/LaserScan` | ld19_driver | dashboard |
+| `/imu/data_raw` | `sensor_msgs/Imu` | mpu6050_driver | dashboard, once the bridge forwards it (Phase 3) |
 | `/cmd_vel` | `geometry_msgs/Twist` | dashboard | motor_driver |
 | `/motor_status` | `std_msgs/Float64MultiArray` | motor_driver | dashboard |
+| `/camera/image_raw/compressed` | `sensor_msgs/CompressedImage` | camera_driver | dashboard (as MJPEG) |
+| `/camera/image_raw` | `sensor_msgs/Image` | camera_driver, only while subscribed | nothing yet |
+| `/camera/still/compressed` | `sensor_msgs/CompressedImage` | camera_driver, per `/camera/capture` | dashboard |
 
-Coordinate frames: `map → odom → base_link → laser_link` and `base_link → imu_link`. Cartographer publishes
-`map → odom → base_link`; two static transforms in the launch file give `laser_link` and `imu_link`.
+The bridge also subscribes to `/robot_pose` and `/map`, but nothing publishes them, so the dashboard gets
+neither and the scan points are drawn as if the robot sat at the origin facing +x.
+
+Frames: `laser_link` for the LiDAR and `imu_link` for the IMU, both mounted on `base_link`. No TF is
+published; the bridge places the LiDAR on the robot with its `laser_x`, `laser_y` and `laser_yaw` parameters.
 
 ## Phase 0: Wiring and container access
 
@@ -71,9 +74,6 @@ and the MPU6050 on I2C bus 1 (`/dev/i2c-1`). `docker/dev.sh up` already passes b
 1. Check the IMU: `docker/dev.sh i2cdetect -y 1` should show `68`.
 2. Check the LiDAR: `docker/dev.sh bash -c 'stty -F /dev/ttyS0 230400 raw -echo; timeout 2 od -An -tx1 /dev/ttyS0 | head'`
    should show bytes, with `54 2c` appearing regularly.
-3. Before Phase 3, add `ros-jazzy-cartographer-ros` to the `apt-get install`
-   line in `docker/Dockerfile`. Then, with no live driver running, rebuild and recreate the container:
-   `docker/dev.sh down && docker/dev.sh image && docker/dev.sh up`
 
 ## Phase 1: LD19 LiDAR driver (`prowl_ld19_driver`)
 
@@ -125,8 +125,7 @@ Steps:
    - `frame_id` `laser_link`. Use fixed bins, e.g. 0.5° (720 bins), with `angle_min` 0 and
      `angle_increment` **−**2π/720, so bin i is sensor angle i × 0.5° clockwise (ROS angle `−angle`). The
      LD19 spins clockwise, so this keeps the bins in the order they were measured, which is what
-     `time_increment` assumes; Cartographer uses it to correct scans for the robot's motion. A positive
-     increment would list the points backwards in time.
+     `time_increment` assumes. A positive increment would list the points backwards in time.
    - Empty bins and distance-0 points are `+inf`. Make `range_min` and `range_max` params; check the LD19
      spec sheet, which gives about 0.02–12 m.
    - `scan_time` = 360 / speed, `time_increment` = `scan_time` / bins, stamp = when the rotation started.
@@ -155,12 +154,10 @@ Still open:
 
 - **Accelerometer offsets.** Standing still, `|a|` reads 9.11 m/s² instead of 9.81 (about 70 mg low,
   within the MPU-6050's zero-g offset spec). Finding per-axis offsets needs a six-position calibration,
-  i.e. resting the robot on each side in turn, which wasn't possible yet. Cartographer only uses the
-  direction of gravity, so this doesn't block Phase 3.
+  i.e. resting the robot on each side in turn, which wasn't possible yet.
 - **Gyro bias drifts with temperature.** Over 3 minutes the chip warmed by 0.7 °C and the Z bias rose by
   about 0.08 °/s (roughly 0.1 °/s per °C). The bias is only measured at startup, so start the driver once
-  the robot has warmed up, or restart it before a long mapping run. Scan matching corrects slow heading
-  drift.
+  the robot has warmed up, or restart it before a long run.
 - Turning the robot left to check for a positive `angular_velocity.z` (the last "done when" check) still
   needs the robot moved.
 
@@ -200,52 +197,17 @@ Steps:
    to rad/s: raw / LSB per °/s × π/180.
 4. At startup, average about 2 s of gyro readings with the robot still, and subtract that bias from then on.
 5. Publish `sensor_msgs/Imu` on `/imu/data_raw` with `frame_id` `imu_link`. Fill in angular velocity and
-   linear acceleration, keeping gravity in because Cartographer expects it. Set `orientation_covariance[0]`
+   linear acceleration, keeping gravity in as `sensor_msgs/Imu` expects. Set `orientation_covariance[0]`
    to −1, which means "no orientation".
-6. Mount the board flat with its X arrow pointing forward, and its axes already match ROS. If you can't, set
-   the rotation in the static transform instead (Phase 3).
+6. Mount the board flat with its X arrow pointing forward, and its axes already match ROS. If you can't,
+   note the rotation so whatever reads `/imu/data_raw` can correct for it.
 7. Unit test the raw-to-SI conversion.
 
 **Done when:** standing still gives an acceleration of about (0, 0, +9.8) m/s² and a gyro of about 0, turning
 the robot left (counter-clockwise from above) gives a positive `angular_velocity.z`, and
 `ros2 topic hz /imu/data_raw` shows about 100 Hz.
 
-## Phase 3: Mapping with Cartographer
-
-Prowl has no wheel encoders, so there's no odometry. Cartographer's 2D SLAM builds the map from LiDAR scan
-matching plus the IMU, with no odometry needed, and it's packaged for Jazzy (`ros-jazzy-cartographer-ros`).
-`slam_toolbox`, the other common choice, needs an odometry source we don't have.
-
-1. Create a `prowl_bringup` package with `config/cartographer_2d.lua` and `launch/prowl.launch.py`.
-2. Measure where the LiDAR and IMU sit relative to the robot's center. Add two `static_transform_publisher`
-   nodes to the launch file:
-   - `base_link → laser_link`, rotated so the LiDAR's 0° faces forward.
-   - `base_link → imu_link`.
-3. Write the Lua config from the
-   [Cartographer ROS configuration docs](https://google-cartographer-ros.readthedocs.io/en/latest/configuration.html).
-   Cartographer won't start if any option in the `options` table is missing, so work through the full list
-   in the docs. The values that matter here:
-   - `map_frame = "map"`, `tracking_frame = "imu_link"`, `published_frame = "base_link"`,
-     `odom_frame = "odom"`
-   - `provide_odom_frame = true`, `use_odometry = false`, `num_laser_scans = 1`
-   - `MAP_BUILDER.use_trajectory_builder_2d = true` and `TRAJECTORY_BUILDER_2D.use_imu_data = true`
-   - `TRAJECTORY_BUILDER_2D.min_range` / `max_range`, matching the LiDAR driver
-   - `TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = true`, which helps a lot without
-     odometry
-4. Launch two nodes:
-   - `cartographer_node`, with `-configuration_directory` and `-configuration_basename cartographer_2d.lua`,
-     remapping `scan → /scan` and `imu → /imu/data_raw`.
-   - `cartographer_occupancy_grid_node` (`-resolution 0.05 -publish_period_sec 1.0`), which publishes `/map`.
-5. Record one test drive (`ros2 bag record /scan /imu/data_raw /tf_static`). Then you can replay it and tune
-   the config without driving the robot again.
-
-Tips: drive slowly, especially when turning. Without odometry, fast spins are where scan matching loses
-track. Featureless spaces, like long blank corridors, are hard for any LiDAR SLAM.
-
-**Done when:** a slow loop around a room gives a clean map, and the robot's position on it follows the real
-robot.
-
-## Phase 4: Dashboard link
+## Phase 3: Dashboard link
 
 The dashboard connects straight to the robot, with no backend in between. This was going to be rosbridge,
 but it's now our own bridge, `prowl_dashboard_bridge`: a ROS2 node written in Node.js (rclnodejs + ws) that
@@ -258,43 +220,70 @@ Edge side:
 
 1. ~~Bridge node: `/robot_pose`, `/scan`, `/map`, `/motor_status` to the dashboard, drive requests to
    `/cmd_vel`.~~ Done, tested in dry run.
-2. `/robot_pose`: `prowl_brain` will publish it (`geometry_msgs/PoseStamped` in `map`); it's stubs so far.
-3. Add the bridge, and `motor_driver` with a `live` argument that defaults to false (dry run), to
-   `prowl.launch.py`.
+2. ~~Forward `/imu/data_raw` to the dashboard.~~ Done: an `imu` message 5 times a second, each the average
+   of the readings since the last one.
+3. ~~Add the IMU driver to `test_page.launch.py`.~~ Done. The bridge also tells the dashboard whether the
+   motor driver is live or in dry run (`status.motors`), and saves every photo for the Photos page.
 4. Measure the LiDAR's position on the robot (`laser_x`, `laser_y`, `laser_yaw` in
-   `dashboard_bridge.yaml`), so scan points line up with the map.
-5. Decide who owns `/cmd_vel` when both `prowl_brain` and a dashboard want to drive.
+   `dashboard_bridge.yaml`), so scan points sit in the right place around the robot.
 
 Frontend side (`frontend/`):
 
 1. ~~Hold-to-drive: `src/live/useDrive.js`.~~ Done; it sends drive requests 10 times a second while a
    button is held and a zero on release. `useProwlLink` passes the page's `?token=` on to the socket.
 2. Point the dashboard at the robot: `PROWL_BACKEND=http://<pi address>:8000` in `frontend/.env.local`.
-3. Add drive buttons with `useDrive`, and show `motor_status` and the `scan` points (`useProwlLink` doesn't
-   keep them yet).
+3. ~~Drive buttons, wheel duties, IMU and the LiDAR.~~ Done: the remote-control bar under the map and the
+   LiDAR scope (`FRONTEND_HOOKUP.md`, "Status").
+4. ~~Live camera, "take photo", and the Photos page.~~ Done. Still to do on the robot: a live drive check,
+   and checking the scope against the real room.
 
 Without a `drive_token`, anyone on the same network can drive the robot. Set one, and use a private hotspot
 for the demo, not shared Wi-Fi.
 
-**Done when:** the dashboard shows the live map, the robot and the LiDAR points, and can drive the robot.
+**Done when:** the dashboard shows the LiDAR points around the robot, the camera, the wheel duties and the
+IMU readings, and can drive the robot.
+
+## Phase 4: Camera driver (`prowl_camera_driver`)
+
+**Status: done.** On the robot: 1280×720 JPEG video at 30 fps with no dropped frames, and 4608×2592 photos
+in about 0.8 s. The bridge serves both over HTTP (`/api/camera/`), and its test page shows them. See the
+README for how to run it.
+
+The camera is a Camera Module 3 Wide (IMX708 sensor) on the CSI port. There's no register-level manual
+for it, so the driver works through [libcamera](https://libcamera.org/api-html/), the Pi's camera stack:
+it runs the sensor, the CSI receiver and the ISP, plus exposure, white balance and autofocus, with tuning
+for the IMX708. The [Pi's camera docs](https://www.raspberrypi.com/documentation/accessories/camera.html)
+give the sensor modes and the `rpicam` tools for checking it outside ROS. What the driver does:
+
+1. Video: one YUV 4:2:0 stream at 1280×720, read from the 2304×1296 sensor mode (the whole field of view; by
+   itself libcamera picks a 1536×864 crop for 720p). Frame rate fixed with `FrameDurationLimits`, continuous
+   autofocus with `AfMode`.
+2. Each frame goes straight into TurboJPEG: in the sYCC colour space the ISP's YUV is already what a JPEG
+   stores. RGB is only made for `/camera/image_raw` subscribers.
+3. Photos: stop, reconfigure for the full 4608×2592 mode, skip a few frames while exposure and focus settle,
+   encode one, and go back to video.
+
+Still open:
+
+- **Where it sits on the robot.** Measure it for a `camera_link` transform, together with the LiDAR's.
+- **Calibration.** No `camera_info` yet. Detection that needs angles or distances (the backend protocol's
+  camera "samples") needs the lens calibrated first.
 
 ## Putting it together
 
 One launch file runs the whole demo:
 
 ```bash
-docker/dev.sh ros2 launch prowl_bringup prowl.launch.py live:=true
+docker/dev.sh ros2 launch prowl_dashboard_bridge test_page.launch.py live:=true
 ```
 
-It starts both sensor drivers, the static transforms, Cartographer, the dashboard bridge, `robot_pose` and
-the motor driver. `./prowl` still works for motor-only testing. While the launch file's driver is running, the
+It starts the LD19 driver, the IMU driver, the camera driver, the motor driver and the dashboard bridge.
+Without `live:=true` the motors stay in dry run, and the test page and dashboard say so. `./prowl` still works for motor-only testing. While the launch file's driver is running, the
 panel shows `RUNNING (started outside the panel)` but can still drive.
 
 ## After the hackathon
 
 - Measure `wheel_separation`, `wheel_base` and `max_linear_speed` (TODOs in `motor_driver.yaml`).
-- Add wheel encoders for real odometry, then `slam_toolbox` and Nav2 for autonomous driving (click a goal on
-  the dashboard).
-- Save and reload maps.
-- Add the camera stream (left out for now).
+- Add wheel encoders for real odometry.
+- Hardware H.264 video (the Pi 4's encoder) if MJPEG uses too much Wi-Fi.
 - Real logins for the dashboard bridge instead of one shared token, or route the dashboard through `backend/`.

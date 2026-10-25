@@ -21,13 +21,41 @@ import SelectionBar from './components/SelectionBar.jsx'
 import SampleInspector from './components/SampleInspector.jsx'
 import CameraPanel from './components/CameraPanel.jsx'
 import ActivityStrip from './components/ActivityStrip.jsx'
+import DriveBar from './components/DriveBar.jsx'
+import LidarScope, { LidarLegend } from './components/LidarScope.jsx'
+import PhotosPage from './components/PhotosPage.jsx'
+import CameraPage from './components/CameraPage.jsx'
 import MoonGlobeWindow from './components/MoonGlobeWindow.jsx'
 import SectionIcon from './components/SectionIcon.jsx'
 import { backgroundPhoto } from './data/backgroundPhoto.js'
-import { useProwlLink } from './live/useProwlLink.js'
+import { useProwlLink, pageToken } from './live/useProwlLink.js'
+import { useDrive } from './live/useDrive.js'
 import { buildLiveMission } from './live/liveMission.js'
 import { labelsFor, connectionText } from './live/labels.js'
 import { useNow } from './live/useNow.js'
+
+const DRIVE_ERROR_S = 6 // how long a drive error from the robot stays on screen
+
+// The robot's drive token is remembered in this browser, so driving stays unlocked after a reload.
+function readToken() {
+  try {
+    return localStorage.getItem('prowl-drive-token') || ''
+  } catch {
+    return ''
+  }
+}
+
+// The robot's Camera and Photos pages have their own addresses (#camera, #photos), so the browser's Back button and
+// links work. Everything else is the dashboard (the map page).
+const ROBOT_PAGES = [
+  { id: 'dashboard', label: 'Map', icon: 'map' },
+  { id: 'camera', label: 'Camera', icon: 'camera' },
+  { id: 'photos', label: 'Photos', icon: 'scan' },
+]
+const pageFromAddress = () => {
+  const name = window.location.hash.slice(1)
+  return name === 'camera' || name === 'photos' ? name : 'dashboard'
+}
 
 function App() {
   // App owns the data that more than one panel needs. Panels get it as props.
@@ -60,13 +88,27 @@ function App() {
     }
   }, [colorBlind])
 
-  // ---- Live data from the Prowl backend (see src/live/) ----
+  // ---- Live data from the Prowl backend, or straight from the robot (see src/live/) ----
   // Once a robot or the simulator has connected, everything on screen comes from it instead of the demo data.
-  const link = useProwlLink()
+  const [token, setToken] = useState(readToken)
+  const link = useProwlLink(token)
+  // Connected straight to the robot's own server (edge/src/prowl_dashboard_bridge) rather than the backend. Only then
+  // are the remote control, the LiDAR scope, the live camera and the Photos page shown.
+  const onRobot = !!link.session && link.capabilities.drive === 'hold'
+  const drive = useDrive(link)
+
+  // Connected to the robot, the page drops its most expensive effects (see "Connected straight to the robot" in
+  // index.css): the blurred glass behind every panel and the looping animations. With the robot's live readings,
+  // those made the browser re-draw the whole blurred page several times a second, which is what made it lag.
+  useEffect(() => {
+    if (onRobot) document.documentElement.dataset.link = 'robot'
+    else delete document.documentElement.dataset.link
+  }, [onRobot])
+  const [page, setPage] = useState(pageFromAddress)
   const [noteDrafts, setNoteDrafts] = useState({}) // live notes still being typed on this page, by finding id
   const noteTimers = useRef({})
   const live = link.session ? buildLiveMission(link, noteDrafts) : null
-  const labels = labelsFor(live ? live.mode : 'demo')
+  const labels = labelsFor(live ? (onRobot ? 'bridge' : live.mode) : 'demo')
   const connection = connectionText({
     mode: live?.mode,
     connection: link.connection,
@@ -79,6 +121,9 @@ function App() {
 
   const demoElapsed = useMissionClock(mission.elapsedStartSeconds)
   const now = useNow()
+  const driveError =
+    link.lastError?.forType === 'drive' && now - link.lastError.at < DRIVE_ERROR_S ? link.lastError.error : null
+  const topicAges = link.status?.topic_age_s
   const elapsedSeconds = live ? Math.max(0, Math.floor(now - live.startedAt)) : demoElapsed
   const isDrawerMode = useMediaQuery('(min-width: 720px) and (max-width: 1099px)')
 
@@ -125,6 +170,17 @@ function App() {
     }
     drawerWasOpen.current = drawerOpen
   }, [drawerOpen, isDrawerMode])
+
+  // The browser's Back and Forward buttons move between the dashboard and the Photos page.
+  useEffect(() => {
+    const follow = () => setPage(pageFromAddress())
+    window.addEventListener('hashchange', follow)
+    window.addEventListener('popstate', follow)
+    return () => {
+      window.removeEventListener('hashchange', follow)
+      window.removeEventListener('popstate', follow)
+    }
+  }, [])
 
   // Pressing Escape closes the drawer, wherever the keyboard focus is.
   useEffect(() => {
@@ -187,6 +243,25 @@ function App() {
     setQueue([...queue, record])
   }
 
+  function saveToken(value) {
+    setToken(value)
+    try {
+      localStorage.setItem('prowl-drive-token', value)
+    } catch {
+      // storage is blocked: the token works until the page is reloaded
+    }
+  }
+
+  function openPage(id) {
+    if (id === page) return
+    if (id === 'dashboard') {
+      window.history.pushState(null, '', window.location.pathname + window.location.search)
+      setPage('dashboard')
+    } else {
+      window.location.hash = id
+    }
+  }
+
   // "Open details" opens the drawer on iPad, or jumps to the Review tab on a phone.
   function openDetails() {
     if (isDrawerMode) {
@@ -204,69 +279,125 @@ function App() {
         clockLabel={labels.clockLabel}
         connection={connection}
         onOpenGlobe={() => setGlobeOpen(true)}
+        pages={onRobot ? ROBOT_PAGES : null}
+        page={page}
+        onPage={openPage}
         colorBlind={colorBlind}
         onToggleColorBlind={() => setColorBlind((current) => !current)}
       />
       <MoonGlobeWindow open={globeOpen} onClose={() => setGlobeOpen(false)} />
-      <MobileTabs activeTab={tab} onChange={setTab} />
+      <MobileTabs
+        activeTab={page === 'dashboard' ? tab : page}
+        onChange={(id) => {
+          if (id === 'camera' || id === 'photos') return openPage(id)
+          openPage('dashboard')
+          setTab(id)
+        }}
+        extraTabs={onRobot ? ROBOT_PAGES.slice(1) : []}
+      />
 
-      <main className="workspace" data-tab={tab}>
-        <FindingsList
-          samples={shown.samples}
-          obstacles={shown.obstacles}
-          selectedId={currentId}
-          onSelect={setSelectedId}
-          labels={labels}
+      {page === 'photos' ? (
+        <PhotosPage
+          available={onRobot && link.capabilities.photos}
+          changed={link.photosChanged}
+          token={pageToken(token)}
+          onBack={() => openPage('dashboard')}
         />
-        <MissionMap
-          area={mapArea}
-          world={moonWorld}
-          zoneName={shown.mission.name}
-          path={shown.path}
-          robot={shown.robot}
-          samples={shown.samples}
-          obstacles={shown.obstacles}
-          selectedId={currentId}
-          onSelect={setSelectedId}
-          scanMap={shown.scanMap}
-          unitCm={live?.unitCm}
-          labels={labels}
+      ) : page === 'camera' ? (
+        <CameraPage
+          available={onRobot && link.capabilities.camera}
+          still={link.cameraStill}
+          cameraAge={topicAges?.camera ?? null}
+          onOpenPhotos={() => openPage('photos')}
+          onBack={() => openPage('dashboard')}
         />
-        {selectedItem && <SelectionBar sample={selectedItem} onOpen={openDetails} buttonRef={openButtonRef} />}
-
-        {isDrawerMode && drawerOpen && (
-          <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-hidden="true"></div>
-        )}
-        {selectedItem ? (
-          <SampleInspector
-            sample={selectedItem}
-            statusOptions={isObstacle ? obstacleStatusOptions : statusOptions}
-            queueState={queueState}
-            isDrawer={isDrawerMode}
-            isOpen={drawerOpen}
-            headingRef={inspectorHeadingRef}
-            onClose={() => setDrawerOpen(false)}
-            onChangeNote={changeNote}
-            onChangeStatus={changeStatus}
-            onQueue={queueReport}
+      ) : (
+        <main className="workspace" data-tab={tab}>
+          <FindingsList
+            samples={shown.samples}
+            obstacles={shown.obstacles}
+            selectedId={currentId}
+            onSelect={setSelectedId}
             labels={labels}
           />
-        ) : (
-          // A live mission with nothing found yet: an empty Investigation panel instead of a crash
-          <aside className={drawerOpen ? 'panel inspector open' : 'panel inspector'} aria-label="Sample inspector">
-            <div className="panel-heading">
-              <h2 ref={inspectorHeadingRef} tabIndex={-1}>
-                <SectionIcon name="scan" />
-                Investigation
-              </h2>
-            </div>
-            <p className="empty-inspector">{labels.emptyFindings} Points of interest and obstacles appear here.</p>
-          </aside>
-        )}
+          <MissionMap
+            area={mapArea}
+            world={moonWorld}
+            zoneName={shown.mission.name}
+            path={shown.path}
+            robot={shown.robot}
+            samples={shown.samples}
+            obstacles={shown.obstacles}
+            selectedId={currentId}
+            onSelect={setSelectedId}
+            scanMap={shown.scanMap}
+            unitCm={live?.unitCm}
+            labels={labels}
+            scope={onRobot ? { view: <LidarScope link={link} scanAge={topicAges?.scan ?? null} />, legend: <LidarLegend /> } : null}
+          />
+          {selectedItem && <SelectionBar sample={selectedItem} onOpen={openDetails} buttonRef={openButtonRef} />}
 
-        <CameraPanel message={labels.camera} />
-        <ActivityStrip samples={shown.samples} obstacles={shown.obstacles} queue={shown.queue} labels={labels} />
-      </main>
+          {isDrawerMode && drawerOpen && (
+            <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-hidden="true"></div>
+          )}
+          {selectedItem ? (
+            <SampleInspector
+              sample={selectedItem}
+              statusOptions={isObstacle ? obstacleStatusOptions : statusOptions}
+              queueState={queueState}
+              isDrawer={isDrawerMode}
+              isOpen={drawerOpen}
+              headingRef={inspectorHeadingRef}
+              onClose={() => setDrawerOpen(false)}
+              onChangeNote={changeNote}
+              onChangeStatus={changeStatus}
+              onQueue={queueReport}
+              labels={labels}
+            />
+          ) : (
+            // A live mission with nothing found yet: an empty Investigation panel instead of a crash
+            <aside className={drawerOpen ? 'panel inspector open' : 'panel inspector'} aria-label="Sample inspector">
+              <div className="panel-heading">
+                <h2 ref={inspectorHeadingRef} tabIndex={-1}>
+                  <SectionIcon name="scan" />
+                  Investigation
+                </h2>
+              </div>
+              <p className="empty-inspector">{labels.emptyFindings} Points of interest and obstacles appear here.</p>
+            </aside>
+          )}
+
+          <CameraPanel
+            message={labels.camera}
+            robot={
+              onRobot && link.capabilities.camera
+                ? {
+                    still: link.cameraStill,
+                    cameraAge: topicAges?.camera ?? null,
+                    onOpenCamera: () => openPage('camera'),
+                    onOpenPhotos: () => openPage('photos'),
+                  }
+                : null
+            }
+          />
+          {/* The robot has no detector yet, so its activity log would always be empty: the map gets the room instead */}
+          {!onRobot && <ActivityStrip samples={shown.samples} obstacles={shown.obstacles} queue={shown.queue} labels={labels} />}
+        </main>
+      )}
+
+      {/* The remote control, under every page while connected to the robot. It stays the same element whichever page
+          is open (it's always in this spot), so switching pages doesn't switch the keyboard driving off. */}
+      {onRobot && (
+        <DriveBar
+          drive={drive}
+          canCommand={link.canCommand}
+          onToken={saveToken}
+          error={driveError}
+          link={link}
+          topicAges={topicAges}
+          motors={link.status?.motors}
+        />
+      )}
 
       {/* The page background is a real NASA image. Say so, give credit, and say what it is NOT. */}
       <footer className="photo-credit">

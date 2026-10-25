@@ -3,7 +3,8 @@
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   gap: 4px;
   padding: 4px;
   border: 0;
@@ -29,6 +30,12 @@
   border-bottom-color: var(--green);
   background: var(--green-dim);
   color: var(--text);
+}
+
+/* Five tabs (with the robot's Camera and Photos) need smaller words to fit a phone */
+.mobile-tabs[data-count='5'] .mobile-tab {
+  font-size: 11px;
+  letter-spacing: 0.04em;
 }
 
 @media (min-width: 720px) {

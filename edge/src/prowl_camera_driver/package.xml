@@ -1,26 +1,22 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>prowl_brain</name>
+  <name>prowl_camera_driver</name>
   <version>0.1.0</version>
-  <description>Prowl's main node: a state machine fed by the LD19, MPU6050 and motor drivers, plus a 10 Hz Ceres scan matcher thread.</description>
+  <description>ROS2 driver for Prowl's Raspberry Pi Camera Module 3: JPEG video and full-resolution stills through libcamera.</description>
   <maintainer email="weien.greathouse@gmail.com">Prowl Edge Team</maintainer>
   <license>TODO</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>pkg-config</buildtool_depend>
 
   <depend>rclcpp</depend>
-  <depend>rcl_interfaces</depend>
   <depend>sensor_msgs</depend>
-  <depend>geometry_msgs</depend>
-  <depend>std_msgs</depend>
-  <depend>libceres-dev</depend>
-  <depend>libsdl2-dev</depend>
+  <depend>std_srvs</depend>
+  <depend>libcamera</depend>
+  <depend>libturbojpeg</depend>
 
   <exec_depend>launch_ros</exec_depend>
-  <exec_depend>prowl_ld19_driver</exec_depend>
-  <exec_depend>prowl_mpu6050_driver</exec_depend>
-  <exec_depend>prowl_motor_driver</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

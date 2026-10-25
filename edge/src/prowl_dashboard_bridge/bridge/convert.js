@@ -22,7 +22,7 @@ export function yawFromQuaternion(q) {
   return Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
 }
 
-function stampSeconds(header) {
+export function stampSeconds(header) {
   return header.stamp.sec + header.stamp.nanosec / 1e9
 }
 
@@ -41,7 +41,7 @@ export function poseMessage(msg) {
 //
 // The scan is in the LiDAR's frame. `laser` places the LiDAR on the robot ({x, y, yaw} in base_link),
 // and `pose` places the robot on the map ({x, y, theta}). Without a pose yet, the robot is taken to be
-// at the map origin facing +x, which is where SLAM starts it.
+// at the map origin facing +x.
 //
 // To keep the message small, bins are taken in groups of `step` and only the nearest valid reading in
 // each group is kept: nearest, so a thin obstacle never disappears from the picture.
@@ -74,8 +74,8 @@ export function scanMessage(msg, { pose, laser, maxPoints }) {
 // nav_msgs/OccupancyGrid -> {type: 'map', ..., encoding: 'png_base64', data}
 //
 // The grid is row-major starting at its origin (bottom-left, row 0 = lowest y). PNG row 0 is the top
-// of the image, so rows are written in reverse. The origin's orientation is ignored: SLAM grids are
-// axis-aligned with the map frame.
+// of the image, so rows are written in reverse. The origin's orientation is ignored: the grid is
+// taken to be axis-aligned with the map frame.
 export function mapMessage(msg) {
   const { width, height, resolution, origin } = msg.info
   const cells = msg.data
@@ -103,4 +103,59 @@ export function mapMessage(msg) {
 // std_msgs/Float64MultiArray from the motor driver -> {type: 'motor_status', wheels, duties}
 export function motorStatusMessage(msg, wheels) {
   return { type: 'motor_status', wheels, duties: Array.from(msg.data, (duty) => round(duty, 3)) }
+}
+
+// The motor driver's answer to rcl_interfaces/GetParameters for ['dry_run'] -> 'dry_run' or 'live',
+// or null if it has no such boolean parameter.
+const PARAMETER_BOOL = 1 // rcl_interfaces/ParameterType
+export function motorsMode(response) {
+  const value = response?.values?.[0]
+  if (!value || value.type !== PARAMETER_BOOL) return null
+  return value.bool_value ? 'dry_run' : 'live'
+}
+
+// sensor_msgs/Imu readings (100 a second from the IMU driver) -> {type: 'imu', t, gyro, accel, samples}
+//
+// The dashboard only gets a few a second, so rather than one reading picked at random, it gets the
+// average of every reading since the last message: steadier, and a short bump still moves it.
+// gyro is angular velocity in rad/s and accel is linear acceleration in m/s² (gravity included), each
+// [x, y, z] in imu_link (x forward, y left, z up when the board is mounted as the roadmap says).
+export class ImuAverage {
+  constructor() {
+    this.clear()
+  }
+
+  clear() {
+    this.gyro = [0, 0, 0]
+    this.accel = [0, 0, 0]
+    this.samples = 0
+    this.t = null
+  }
+
+  add(msg) {
+    const { angular_velocity: w, linear_acceleration: a } = msg
+    this.gyro[0] += w.x
+    this.gyro[1] += w.y
+    this.gyro[2] += w.z
+    this.accel[0] += a.x
+    this.accel[1] += a.y
+    this.accel[2] += a.z
+    this.samples += 1
+    this.t = stampSeconds(msg.header)
+  }
+
+  // The average so far as a message, and starts again. null if nothing came in.
+  take() {
+    if (this.samples === 0) return null
+    const n = this.samples
+    const message = {
+      type: 'imu',
+      t: round(this.t, 3),
+      gyro: this.gyro.map((sum) => round(sum / n, 4)),
+      accel: this.accel.map((sum) => round(sum / n, 3)),
+      samples: n,
+    }
+    this.clear()
+    return message
+  }
 }

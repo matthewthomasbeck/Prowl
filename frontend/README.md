@@ -31,6 +31,41 @@ Run the backend and the simulator (see [../backend/README.md](../backend/README.
 
 During `npm run dev`, `/ws` and `/api` are forwarded to a backend on this computer (`http://localhost:8000`). To use the EC2 server instead, create a file called `.env.local` in this folder containing `PROWL_BACKEND=http://<ec2-public-ip>:8000`. For the demo, the backend serves the built dashboard itself at `http://<ec2-public-ip>:8000/`.
 
+### Straight to the robot
+
+The dashboard can also connect to the robot itself, with no backend: the robot's dashboard bridge
+(`../edge/src/prowl_dashboard_bridge`, messages in its `PROTOCOL.md`). Start it on the Pi
+(`../edge/README.md`, "Test page"), put `PROWL_BACKEND=http://<pi address>:8000` in `.env.local`, and run
+`npm run dev`. Add `?token=<drive_token>` to the page address if the robot has a drive token. The header
+says "Robot connected — live", and a row of tabs under it switches between three pages: **Map**, **Camera**
+and **Photos** (on phones they're extra tabs next to Map, Findings and Review). Every page has the remote
+control along the bottom.
+
+- **The map panel** gets a "Map / LiDAR scope" switch. The scope is what the LiDAR sees right now, with the
+  robot in the middle and forward up, distance rings, fading older scans, and the distance to the nearest
+  thing on each side. The robot doesn't map the area or track its position, so the scope is not a map.
+- **Remote control** along the bottom of every page: hold a button (or, with Keyboard on, W S A D Q E) to drive, let go to
+  stop. Commands are always full speed, which is easiest on the wheels. Stop always works. Next to it: the
+  four wheel duties, the IMU's turn rate and tilt, and whether each sensor is sending. A warning shows
+  while the robot's motors are in dry run, when driving can't move it.
+- **Camera** page: the live video, as big as fits, with a Take photo button, the newest photo and the frame
+  rate actually shown. The video only plays on this page. On the Map page the Rover camera panel just links
+  to it and shows the newest photo.
+- **Photos** page: every photo the robot has kept, with a viewer and a Delete button. Photos can show
+  people near the robot.
+- Points of interest, obstacles and reviews stay empty: nothing on the robot detects them yet, so the
+  activity strip is left out.
+
+Connected to the robot, the dashboard is built to keep up with it (see `src/live/useProwlLink.js` and
+"Connected straight to the robot" in `src/index.css`):
+
+- The panels keep the smoked-glass look but without blurring the picture behind them, and nothing loops
+  (no pulses or sweeps). Re-blurring the page for every new reading was the main reason it lagged.
+- The LiDAR scans, wheel duties and IMU readings (5–10 a second) re-draw only the scope and the readouts
+  that show them, not the whole page.
+- The video is pulled one frame at a time (`/api/camera/frame.jpg`), never more than one frame behind. The
+  robot's MJPEG stream fell seconds behind whenever the browser or the link was slower than the camera.
+
 ## Background image and credit
 
 The page background is **NASA's color map of the whole Moon**, made from Lunar Reconnaissance Orbiter camera data. It is a flat map rather than a photograph, so the dark seas and craters of the whole Moon are visible and it is clearly the Moon. (Two closer-up pictures were tried first, an Apollo 16 photo and a Mars photo, but they were too zoomed in to recognize.) It is real NASA imagery, not AI-generated, and the same file is used by the Moon globe.
@@ -98,7 +133,7 @@ Clicking a pin or a point of interest selects the same sample everywhere. A targ
 
 - **Desktop (1100px and wider):** the map is the whole world, with points of interest and camera floating on the left and the investigation panel on the right. On a laptop-height window everything fits, and long panels scroll inside themselves.
 - **iPad (720px to 1099px):** a large map with points of interest and camera beside it. "Open details" slides the investigation panel in as a drawer. Escape, the Close button or tapping outside closes it.
-- **Phone (under 720px):** Map, Findings and Review tabs. "Open details" on the Map tab jumps to Review.
+- **Phone (under 720px):** Map, Findings and Review tabs, plus Photos when connected to the robot. "Open details" on the Map tab jumps to Review.
 
 ## How the code fits together
 
@@ -123,7 +158,11 @@ src/
     MissionMap.jsx           The map, rover, path, targeting frame and clickable pins
     SelectionBar.jsx         "Selected" bar with Open details (iPad and phone)
     SampleInspector.jsx      The investigation panel (a drawer on iPad)
-    CameraPanel.jsx          The offline camera panel
+    CameraPanel.jsx          The camera panel: offline, or a link to the Camera page and the newest photo
+    CameraPage.jsx           The robot's live video and Take photo (robot only)
+    LidarScope.jsx           The LiDAR scope around the robot (robot only)
+    DriveBar.jsx             Remote control, wheels, IMU and sensor health, under every page (robot only)
+    PhotosPage.jsx           Every photo the robot kept, with a viewer (robot only)
     ActivityStrip.jsx        Discovery and local queue activity
     StatusBadge.jsx          Status label with a symbol, so it never relies on color alone
 ```
@@ -136,7 +175,7 @@ Look and feel: colors live as variables in `src/index.css`. Green marks the rove
 
 - **Starter (boilerplate):** the project was created from the official Vite React starter (`npm create vite@latest -- --template react`). Its basic files (`index.html`, `vite.config.js`, `src/main.jsx`, `.oxlintrc.json`, and the favicon) come from that starter. Everything else was written for this project.
 - **Libraries:** only React and React DOM, plus Vite and Oxlint for building and checking. There is no UI library and no 3D library.
-- **External APIs:** none. The dashboard only talks to the team's own Prowl backend (`../backend`). The two NASA images are plain files bundled with the app.
+- **External APIs:** none. The dashboard only talks to the team's own Prowl backend (`../backend`) or the robot's own bridge (`../edge`). The two NASA images are plain files bundled with the app.
 - **Images:** two real NASA images, credited on screen and in [src/assets/CREDITS.md](src/assets/CREDITS.md). No images or video were generated by AI.
 - **Design inspiration:** one public design shot was looked at for general mood only (a dark palette, thin lines, spacing). No code, layout or assets from it were copied.
 

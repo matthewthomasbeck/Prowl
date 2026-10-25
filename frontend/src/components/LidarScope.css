@@ -1,0 +1,149 @@
+/* The LiDAR scope reuses the map's dark instrument screen (.map), corner brackets, robot marker, labels and
+   range buttons, so it looks like the same screen in a different mode. Only what is new is styled here. */
+.scope {
+  cursor: default;
+  touch-action: auto;
+  /* a faint glow in the middle, like a radar screen */
+  background: radial-gradient(circle at 50% 50%, rgba(var(--green-rgb), 0.07), transparent 60%), var(--map-ground);
+}
+
+.scope-ring {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.55;
+}
+
+.scope-axis {
+  stroke: var(--border-strong);
+  stroke-width: 1px;
+  stroke-dasharray: 2 4;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.35;
+}
+
+/* LiDAR returns (drawn in LidarScope.jsx): near-white like the solid outlines of the LiDAR map, with a soft halo */
+.scope-dots {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.scope-ruler {
+  left: calc(50% + 6px);
+  transform: translateY(-100%);
+}
+
+.scope-forward {
+  top: calc(50% - 30px);
+  left: 50%;
+}
+
+/* Clearance on each side: small dark tags along the edges, like the map's labels */
+.scope-clearance {
+  position: absolute;
+  z-index: 2;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  background: rgba(5, 8, 12, 0.8);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #e6ebef;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.scope-clearance .mono {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.scope-front {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.scope-back {
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.scope-left {
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+}
+
+.scope-right {
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+}
+
+/* Something close on that side: amber, the "needs attention" color, plus the warning symbol and word */
+.scope-clearance.close {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.scope-message {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  z-index: 2;
+  max-width: 80%;
+  padding: 4px 12px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border-strong);
+  background: rgba(5, 8, 12, 0.85);
+  font-size: 13px;
+  text-align: center;
+  color: var(--text);
+}
+
+/* The range buttons go in a row along the bottom edge, as on the map on phones: a tall stack would reach the
+   middle of the right edge, where the right clearance label is */
+.scope .map-zoom {
+  display: flex;
+  bottom: 12px;
+}
+
+/* The chosen range is filled, so it is clear without color */
+.scope .map-zoom-button[aria-pressed='true'] {
+  border-color: var(--text);
+  background: var(--text);
+  color: #0a0c0e;
+}
+
+/* Legend swatches for the scope */
+.swatch-scan {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f1f4f6;
+}
+
+.swatch-scan-old {
+  opacity: 0.4;
+}
+
+.swatch-ring {
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+/* On phones the side labels are shorter, so they don't cover the scan */
+@media (max-width: 480px) {
+  .scope-clearance {
+    padding: 1px 5px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+}

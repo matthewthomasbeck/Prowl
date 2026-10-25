@@ -58,6 +58,8 @@ function multiples(step, max) {
 
 // scanMap (live only): the robot's LiDAR map as an image placed in local units { href, x, y, width, height }.
 // unitCm (live only): how many centimetres one local grid unit is. labels: wording for the data source.
+// scope (robot only): another view of the panel, { view, legend }: the LiDAR scope (LidarScope.jsx). When it is
+// given, the panel can switch between the map and the scope, and starts on the scope.
 function MissionMap({
   area,
   world,
@@ -71,7 +73,10 @@ function MissionMap({
   scanMap = null,
   unitCm,
   labels = labelsFor('demo'),
+  scope = null,
 }) {
+  const [panelView, setPanelView] = useState('scope') // 'map' or 'scope'; only used when there is a scope
+  const showScope = !!scope && panelView === 'scope'
   const items = [...samples, ...obstacles] // anything on the map that can be selected
   const ratio = area.height / area.width // the map box is the same shape as the survey zone
   const fitZoom = world.width / area.width // the zoom where the survey zone exactly fills the screen
@@ -305,11 +310,24 @@ function MissionMap({
           <SectionIcon name="map" />
           Exploration map
         </h2>
-        <span className="tag">{labels.mapTag}</span>
+        {scope && (
+          <span className="view-switch" role="group" aria-label="What this panel shows">
+            <button className={showScope ? 'view-option' : 'view-option active'} onClick={() => setPanelView('map')} aria-pressed={!showScope}>
+              Map
+            </button>
+            <button className={showScope ? 'view-option active' : 'view-option'} onClick={() => setPanelView('scope')} aria-pressed={showScope}>
+              LiDAR scope
+            </button>
+          </span>
+        )}
+        <span className="tag">{showScope ? 'Live LiDAR · around the robot' : labels.mapTag}</span>
       </div>
 
-      {/* map-stage gives the map room; --map-ratio keeps the map box the same shape as the survey zone */}
-      <div className="map-stage">
+      {showScope && <div className="map-stage">{scope.view}</div>}
+
+      {/* map-stage gives the map room; --map-ratio keeps the map box the same shape as the survey zone.
+          While the scope is showing, the map is only hidden, so it keeps its place and zoom. */}
+      <div className="map-stage" hidden={showScope}>
         <div
           ref={mapRef}
           className="map"
@@ -539,40 +557,47 @@ function MissionMap({
         </div>
       </div>
 
-      <ul className="legend">
-        <li>
-          <span className="swatch swatch-robot"></span>Robot
-        </li>
-        <li>
-          <span className="swatch swatch-path"></span>Traveled path
-        </li>
-        <li>
-          <span className="swatch swatch-zone"></span>Survey zone
-        </li>
-        <li>
-          <span className="swatch swatch-obstacle"></span>
-          {labels.legendObstacle}
-        </li>
-        {scanMap && (
-          <li>
-            <span className="swatch swatch-lidar"></span>LiDAR map
-          </li>
-        )}
-        <li>
-          <span className="swatch swatch-review"></span>Needs review
-        </li>
-        <li>
-          <span className="swatch swatch-reviewed"></span>Reviewed
-        </li>
-        <li>
-          <span className="swatch swatch-selected"></span>Selected
-        </li>
-      </ul>
-      <p className="map-note">
-        {scanMap && `The bright outlines and green tint are the LiDAR map. One grid unit is ${unitCm} cm. `}
-        Zoomed out: NASA's map of the whole Moon. Close up: {mapGround.description}, {mapGround.credit}. Decorative: the
-        survey zone is {scanMap ? 'not shown at its real place on the Moon, and the photo is not where the robot is' : 'fictional and is not a real place on the Moon'}.
-      </p>
+      {showScope ? (
+        scope.legend
+      ) : (
+        <>
+          <ul className="legend">
+            <li>
+              <span className="swatch swatch-robot"></span>Robot
+            </li>
+            <li>
+              <span className="swatch swatch-path"></span>Traveled path
+            </li>
+            <li>
+              <span className="swatch swatch-zone"></span>Survey zone
+            </li>
+            <li>
+              <span className="swatch swatch-obstacle"></span>
+              {labels.legendObstacle}
+            </li>
+            {scanMap && (
+              <li>
+                <span className="swatch swatch-lidar"></span>LiDAR map
+              </li>
+            )}
+            <li>
+              <span className="swatch swatch-review"></span>Needs review
+            </li>
+            <li>
+              <span className="swatch swatch-reviewed"></span>Reviewed
+            </li>
+            <li>
+              <span className="swatch swatch-selected"></span>Selected
+            </li>
+          </ul>
+          <p className="map-note">
+            {scanMap && `The bright outlines and green tint are the LiDAR map. One grid unit is ${unitCm} cm. `}
+            Zoomed out: NASA's map of the whole Moon. Close up: {mapGround.description}, {mapGround.credit}. Decorative: the
+            survey zone is {scanMap ? 'not shown at its real place on the Moon, and the photo is not where the robot is' : 'fictional and is not a real place on the Moon'}.
+            {scope && ' The robot doesn’t track its position yet, so it stays in the middle of the zone.'}
+          </p>
+        </>
+      )}
     </section>
   )
 }

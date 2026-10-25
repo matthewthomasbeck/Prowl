@@ -5,8 +5,10 @@ dashboard_bridge:
     drive_token: ""         # empty = anyone who can reach the port can drive; set one before using a shared network
 
     # Drive requests are fractions of these top speeds. Write them with a decimal point (1.0, not 1).
-    linear_speed: 0.3       # m/s, forward/back and strafe
-    angular_speed: 1.0      # rad/s
+    # They're set so a full request is full motor duty: on Prowl's wheels, slow driving is harder on the
+    # wheels than fast. If motor_driver.yaml's max_linear_speed or wheel geometry changes, change these too.
+    linear_speed: 1.0       # m/s, forward/back and strafe: motor_driver's max_linear_speed
+    angular_speed: 3.34     # rad/s: max_linear_speed / ((wheel_separation + wheel_base) / 2), rounded up
     drive_timeout: 0.3      # s without a drive request before a stop is sent (the motor driver's own is 0.5)
 
     mission_name: Prowl live
@@ -23,3 +25,12 @@ dashboard_bridge:
     scan_rate: 5.0          # Hz
     motor_status_rate: 10.0 # Hz
     map_period: 1.0         # s
+    camera_rate: 15.0       # Hz, most video frames a second each viewer of /api/camera/video.mjpg gets
+    imu_rate: 5.0           # Hz: each imu message is the average of the readings since the last one
+
+    stale_after: 2.0        # s: the robot counts as connected while the LiDAR, motors, IMU or camera sent something this recently
+
+    # Every photo the camera takes is kept here, for the dashboard's photos page. A relative path starts where
+    # the bridge was started (edge/ in the dev container). Past max_photos (about 1 MB each), the oldest goes.
+    photo_dir: data/photos
+    max_photos: 200

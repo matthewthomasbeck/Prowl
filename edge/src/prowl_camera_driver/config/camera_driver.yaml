@@ -1,0 +1,26 @@
+camera_driver:
+  ros__parameters:
+    frame_id: camera_link
+
+    # Video, published as JPEG on /camera/image_raw/compressed (and as rgb8 on /camera/image_raw for
+    # whoever subscribes to it).
+    width: 1280
+    height: 720
+    fps: 30.0
+    jpeg_quality: 80        # 1-100; 80 gives roughly 100 KB per 1280x720 frame
+    # Sensor mode to read the video from. 2304x1296 is the IMX708's whole field of view, binned 2x2
+    # (up to 56 fps). 0 and 0 let libcamera pick, which for 720p is a 1536x864 crop of the middle.
+    sensor_width: 2304
+    sensor_height: 1296
+
+    # Stills: full resolution (4608x2592 on the Camera Module 3), one per call to /camera/capture,
+    # published on /camera/still/compressed. The video pauses for about a second.
+    still_jpeg_quality: 92
+    still_skip_frames: 4    # frames dropped after switching mode, while exposure settles
+
+    autofocus: true         # continuous autofocus
+    rotate_180: false       # true if the camera is mounted upside down
+    # libcamera's own messages: DEBUG, INFO, WARN, ERROR or FATAL. WARN adds three harmless warnings
+    # at every start (no static properties for imx708_wide, legacy SDN tuning).
+    libcamera_log_level: ERROR
+    stats_period: 5.0       # s between fps/size log lines, 0 = off
