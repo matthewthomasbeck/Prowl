@@ -1,8 +1,8 @@
-# Starts what the bridge's test page (http://<pi>:8000/) and the dashboard need: the LD19 driver, the IMU
-# driver, the camera driver, the motor driver and the bridge. Nothing else publishes /cmd_vel.
+# The whole robot, as the dashboard uses it: the LD19 driver, the IMU driver, the camera driver, the motor
+# driver and the bridge. Nothing else publishes /cmd_vel. ./prowl runs this (and serves the dashboard).
 #
-#   docker/dev.sh ros2 launch prowl_dashboard_bridge test_page.launch.py             # motors in dry run (default)
-#   docker/dev.sh ros2 launch prowl_dashboard_bridge test_page.launch.py live:=true  # motors really move
+#   ./prowl dev ros2 launch prowl_dashboard_bridge robot.launch.py             # motors in dry run (default)
+#   ./prowl dev ros2 launch prowl_dashboard_bridge robot.launch.py live:=true  # motors really move
 import os
 
 from ament_index_python.packages import get_package_share_directory

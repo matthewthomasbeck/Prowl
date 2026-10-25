@@ -1,23 +1,17 @@
-// The dashboard side of the bridge: an HTTP server with GET /health, a test page at GET /, the camera
-// under /api/camera/, and the /ws/dashboard WebSocket (see PROTOCOL.md). No ROS in here; index.js
-// passes in the snapshot, the drive gate and the camera feed.
+// The dashboard side of the bridge: an HTTP server with GET /health, the camera and the saved photos
+// under /api/camera/, and the /ws/dashboard WebSocket (see docs/protocol.md). No ROS in here; index.js
+// passes in the snapshot, the drive gate, the camera feed and the photo store.
 
 import http from 'node:http'
-import { readFileSync } from 'node:fs'
 import { timingSafeEqual } from 'node:crypto'
 import { WebSocketServer, WebSocket } from 'ws'
 
 const PATH = '/ws/dashboard'
 const MAX_INCOMING_BYTES = 16 * 1024
 // A dashboard more than this far behind (e.g. on bad Wi-Fi) skips updates until it catches up, so it
-// can't make the bridge buffer without limit. Pose and scan come again within a fraction of a second.
+// can't make the bridge buffer without limit. Scans and wheel duties come again within a fraction of a second.
 const MAX_BUFFERED_BYTES = 1024 * 1024
 const HEARTBEAT_MS = 10000
-// A page for checking the robot from a browser without the dashboard (LiDAR, camera, wheel duties, driving).
-const TEST_PAGE = readFileSync(new URL('./test_page.html', import.meta.url))
-const MJPEG_BOUNDARY = 'prowl-frame'
-// A viewer whose connection has this much video queued up skips frames until it catches up.
-const MAX_BUFFERED_VIDEO_BYTES = 512 * 1024
 const NO_CACHE = { 'Cache-Control': 'no-store' }
 
 function tokenMatches(given, expected) {
@@ -52,41 +46,16 @@ function requestToken(req) {
 
 const PHOTO_PATH = /^\/api\/camera\/photos\/([A-Za-z0-9-]+)\.jpg$/
 
-// snapshot(canDrive) returns the snapshot message for a new dashboard. camera is a CameraFeed
-// (camera.js); cameraRate caps the frames per second each video viewer gets. photos is a PhotoStore
-// (photos.js), or null to leave out /api/camera/photos/.
-export function startServer({ host, port, driveToken, gate, snapshot, camera, cameraRate, photos = null, log }) {
+// snapshot(canDrive) returns the snapshot message for a new dashboard. camera is a CameraFeed (camera.js)
+// and photos a PhotoStore (photos.js).
+export function startServer({ host, port, driveToken, gate, snapshot, camera, photos, log }) {
   const clients = new Set()
-  const videoViewers = new Set()
-
-  // Live video as MJPEG: one JPEG after another in a multipart response, which an <img> shows as video.
-  function streamVideo(res) {
-    res.writeHead(200, { 'Content-Type': `multipart/x-mixed-replace; boundary=${MJPEG_BOUNDARY}`, ...NO_CACHE })
-    // A little slack, so a 30 fps camera capped at 15 sends every other frame rather than every third.
-    const minGapMs = (1000 / cameraRate) * 0.9
-    let lastSent = 0
-    const send = (frame) => {
-      const now = Date.now()
-      if (now - lastSent < minGapMs || res.writableLength > MAX_BUFFERED_VIDEO_BYTES) return
-      lastSent = now
-      res.write(`--${MJPEG_BOUNDARY}\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.jpeg.length}\r\n\r\n`)
-      res.write(frame.jpeg)
-      res.write('\r\n')
-    }
-    if (camera.frame) send(camera.frame)
-    const unsubscribe = camera.onFrame(send)
-    videoViewers.add(res)
-    res.on('close', () => {
-      unsubscribe()
-      videoViewers.delete(res)
-    })
-  }
 
   async function capture(res) {
     const result = await camera.capture()
     if (result.ok) {
       log.info(`camera still: ${result.message}`)
-      sendJson(res, 200, { ok: true, message: result.message, still: result.still })
+      sendJson(res, 200, { ok: true, message: result.message })
     } else {
       sendJson(res, result.busy ? 409 : 503, { ok: false, error: result.error })
     }
@@ -94,18 +63,8 @@ export function startServer({ host, port, driveToken, gate, snapshot, camera, ca
 
   const httpServer = http.createServer((req, res) => {
     const path = req.url.split('?')[0]
-    // The page keeps any ?token= in its address, for its WebSocket.
-    if (req.method === 'GET' && path === '/') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(TEST_PAGE)
-      return
-    }
     if (req.method === 'GET' && path === '/health') {
       sendJson(res, 200, { ok: true, dashboards: clients.size, driving: gate.driving })
-      return
-    }
-    if (req.method === 'GET' && path === '/api/camera/video.mjpg') {
-      streamVideo(res)
       return
     }
     if (req.method === 'GET' && path === '/api/camera/frame.jpg') {
@@ -123,11 +82,11 @@ export function startServer({ host, port, driveToken, gate, snapshot, camera, ca
       capture(res).catch((err) => sendJson(res, 500, { ok: false, error: err.message }))
       return
     }
-    if (photos && req.method === 'GET' && path === '/api/camera/photos') {
+    if (req.method === 'GET' && path === '/api/camera/photos') {
       sendJson(res, 200, { ok: true, photos: photos.list() })
       return
     }
-    const photo = photos && path.match(PHOTO_PATH)
+    const photo = path.match(PHOTO_PATH)
     if (photo && req.method === 'GET') {
       const jpeg = photos.read(photo[1])
       if (jpeg) sendSavedJpeg(res, jpeg)
@@ -138,7 +97,7 @@ export function startServer({ host, port, driveToken, gate, snapshot, camera, ca
     if (photo && req.method === 'DELETE') {
       req.resume()
       if (driveToken && !tokenMatches(requestToken(req), driveToken)) {
-        sendJson(res, 403, { ok: false, error: 'deleting photos needs the operator token' })
+        sendJson(res, 403, { ok: false, error: 'deleting photos needs the drive token' })
       } else if (!photos.remove(photo[1])) {
         sendJson(res, 404, { ok: false, error: 'no such photo' })
       } else {
@@ -150,8 +109,8 @@ export function startServer({ host, port, driveToken, gate, snapshot, camera, ca
     }
     res.writeHead(404, { 'Content-Type': 'text/plain' })
     res.end(
-      'Prowl dashboard bridge: connect a WebSocket to /ws/dashboard, open / for the test page, or see ' +
-        '/api/camera/video.mjpg, /api/camera/frame.jpg, /api/camera/still.jpg and /api/camera/photos\n',
+      'Prowl dashboard bridge: the dashboard connects a WebSocket to /ws/dashboard and gets the camera from ' +
+        '/api/camera/ (frame.jpg, still.jpg, capture, photos). The dashboard itself is at the address ./prowl prints.\n',
     )
   })
   const wss = new WebSocketServer({ server: httpServer, path: PATH, maxPayload: MAX_INCOMING_BYTES })
@@ -163,7 +122,7 @@ export function startServer({ host, port, driveToken, gate, snapshot, camera, ca
   function handle(client, message) {
     switch (message.type) {
       case 'drive': {
-        if (!client.canDrive) return send(client, { type: 'error', error: 'driving needs the operator token', for_type: 'drive' })
+        if (!client.canDrive) return send(client, { type: 'error', error: 'driving needs the drive token', for_type: 'drive' })
         const result = gate.drive(client, message)
         if (!result.ok) send(client, { type: 'error', error: result.error, for_type: 'drive' })
         return
@@ -241,7 +200,6 @@ export function startServer({ host, port, driveToken, gate, snapshot, camera, ca
     close() {
       clearInterval(heartbeat)
       for (const client of clients) client.ws.close(1001, 'bridge shutting down')
-      for (const viewer of videoViewers) viewer.end() // a video stream would otherwise keep the server open
       wss.close()
       httpServer.close()
     },

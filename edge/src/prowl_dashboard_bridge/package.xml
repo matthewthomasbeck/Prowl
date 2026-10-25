@@ -10,12 +10,11 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>nav_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>std_srvs</exec_depend>
   <exec_depend>launch_ros</exec_depend>
-  <!-- Only for launch/test_page.launch.py. -->
+  <!-- Only for launch/robot.launch.py. -->
   <exec_depend>prowl_camera_driver</exec_depend>
   <exec_depend>prowl_ld19_driver</exec_depend>
   <exec_depend>prowl_motor_driver</exec_depend>
