@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+# Prowl: one command for the robot. Run it on the robot's Raspberry Pi; the robot's code runs in a Docker container.
+#
+#   ./prowl                 start the robot and serve its dashboard; asks whether the motors should be live
+#   ./prowl --live          the same, and driving really moves the robot
+#   ./prowl --dry-run       the same, but the motors stay still (the wheel readout still responds)
+#   ./prowl panel           the motor panel, in this terminal (starts in dry run; L switches to live)
+#   ./prowl lidar [port]    the LiDAR viewer, in this terminal (default port /dev/ttyS0)
+#   ./prowl imu [bus addr]  the IMU monitor, in this terminal (default I2C bus 1, address 0x68)
+#   ./prowl dev <command>   any command in the container, e.g. ./prowl dev colcon build (see edge/docker/dev.sh)
+#   ./prowl help            this list
+#
+# DASHBOARD_PORT=8080 ./prowl serves the dashboard on port 8080 instead of 5173.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+DEV="$ROOT/edge/docker/dev.sh"
+FRONTEND="$ROOT/frontend"
+BRIDGE_CONFIG="$ROOT/edge/src/prowl_dashboard_bridge/config/dashboard_bridge.yaml"
+IMAGE=prowl-edge-dev:jazzy # dev.sh's image, which also builds and serves the dashboard (Node isn't installed on the Pi)
+WEB=prowl-dashboard-web # the container serving the built dashboard
+PORT="${DASHBOARD_PORT:-5173}"
+# The bridge's port and drive token, from its config
+BRIDGE_PORT="$(sed -nE '/^\s*port:/{s/^\s*port:\s*([0-9]+).*/\1/p;q}' "$BRIDGE_CONFIG")"
+BRIDGE_PORT="${BRIDGE_PORT:-8000}"
+DRIVE_TOKEN="$(sed -nE "/^\s*drive_token:/{s/^\s*drive_token:\s*//;s/\s+#.*//;s/^\"(.*)\"$/\1/;s/^'(.*)'$/\1/;p;q}" "$BRIDGE_CONFIG")"
+# [r] keeps the pattern from matching the shell that looks for it
+LAUNCH='[r]os2 launch prowl_dashboard_bridge'
+WAITER="" # the background job that prints where the dashboard is, once the robot is up
+
+DOCKER=(docker)
+docker info >/dev/null 2>&1 || DOCKER=(sudo docker)
+
+usage() {
+  sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+# Asks a yes/no question. Anything but y or Y, or no answer at all, is no.
+confirm() {
+  local answer=""
+  read -rp "$1 [y/N] " answer || true
+  [[ "$answer" == [yY]* ]]
+}
+
+# Builds the given colcon packages (all of them with no arguments), showing the output only if it fails.
+build() {
+  local out
+  if ! out="$("$DEV" colcon build "$@" 2>&1)"; then
+    echo "$out"
+    exit 1
+  fi
+}
+
+# Processes in the container outlive a dropped SSH connection, so a terminal tool may still be running there.
+# Offers to stop it (by its process name); it shuts down cleanly, and a motor panel stops its motor driver.
+stop_leftover() {
+  local name="$1" question="$2"
+  "$DEV" pgrep -x "$name" >/dev/null || return 0
+  confirm "$question" || exit 1
+  # If it hasn't exited after 5 s, SIGKILL it; a motor panel's driver still gets SIGTERM.
+  "$DEV" bash -c 'pkill -x "$1"
+    for _ in $(seq 50); do pgrep -x "$1" >/dev/null || exit 0; sleep 0.1; done
+    pkill -KILL -x "$1"' bash "$name"
+}
+
+# The bridge's npm packages aren't kept in git: install them on the first run, and again whenever the lockfile
+# changes (needs internet).
+bridge_packages() {
+  "$DEV" bash -c 'cd src/prowl_dashboard_bridge &&
+    [ -e node_modules/rclnodejs/build/Release/rclnodejs.node ] &&
+    [ ! package-lock.json -nt node_modules/.package-lock.json ]' && return
+  echo "installing the dashboard bridge's npm packages..."
+  "$DEV" bash -c 'cd src/prowl_dashboard_bridge && npm ci --no-audit --no-fund'
+}
+
+# Runs a shell command in frontend/ with the dev image's Node.js.
+in_frontend() {
+  "${DOCKER[@]}" run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$FRONTEND:/fe" -w /fe \
+    --entrypoint bash "$IMAGE" -c "$1"
+}
+
+# Builds the dashboard (frontend/). The built version is much lighter in the browser than `npm run dev`.
+build_dashboard() {
+  if [ ! -d "$FRONTEND/node_modules" ] || [ "$FRONTEND/package-lock.json" -nt "$FRONTEND/node_modules/.package-lock.json" ]; then
+    echo "installing the dashboard's npm packages..."
+    in_frontend 'npm ci --no-audit --no-fund'
+  fi
+  echo "building the dashboard..."
+  local out
+  if ! out="$(in_frontend 'npm run build' 2>&1)"; then
+    echo "$out"
+    exit 1
+  fi
+}
+
+# Removes the dashboard's web server when ./prowl stops.
+cleanup() {
+  [ -z "$WAITER" ] || kill "$WAITER" 2>/dev/null || true
+  "${DOCKER[@]}" rm -f "$WEB" >/dev/null 2>&1 || true
+}
+
+# Where to open the dashboard, and what to know before driving. Printed with \r\n line ends: the launch's
+# `docker exec` puts this terminal in raw mode, where a bare \n doesn't go back to the start of the line.
+banner() {
+  local live="$1" addresses=() iface address label
+  while read -r iface address; do
+    case "$iface" in
+      docker* | br-* | veth*) continue ;; # Docker's own networks
+      wlan*) label=Wi-Fi ;;
+      eth* | en*) label=Ethernet ;;
+      tailscale*) label=Tailscale ;;
+      *) label="$iface" ;;
+    esac
+    addresses+=("$(printf '  %-10s  http://%s:%s/' "$label" "${address%/*}" "$PORT")")
+  done < <(ip -o -4 addr show scope global | awk '{print $2, $4}')
+  # Avahi answers for <hostname>.local, which most computers and phones can look up
+  if systemctl is-active --quiet avahi-daemon 2>/dev/null; then
+    addresses+=("$(printf '  %-10s  http://%s.local:%s/' 'By name' "$(hostname)" "$PORT")")
+  fi
+  [ "${#addresses[@]}" -gt 0 ] || addresses=("$(printf '  %-10s  http://localhost:%s/' 'This Pi' "$PORT")")
+
+  {
+    echo
+    echo "Prowl is up. Open the dashboard in a browser on the same network (or Tailscale):"
+    echo
+    printf '%s\n' "${addresses[@]}"
+    echo
+    if [ "$live" = true ]; then
+      echo "Motors: LIVE. The robot moves when someone drives it."
+    else
+      echo "Motors: dry run. Driving won't move the robot (./prowl --live to drive for real)."
+    fi
+    if [ -z "$DRIVE_TOKEN" ]; then
+      echo "Anyone who can open the dashboard can drive: no drive_token is set in"
+      echo "edge/src/prowl_dashboard_bridge/config/dashboard_bridge.yaml."
+    else
+      echo "Driving needs the drive token: type it under Remote control, or add ?token=<drive_token> to the address."
+    fi
+    echo "Ctrl-C stops everything."
+    echo
+  } | sed 's/$/\r/'
+}
+
+# The whole robot (edge/src/prowl_dashboard_bridge/launch/robot.launch.py) and its dashboard, until Ctrl-C.
+robot() {
+  local live=""
+  case "${1:-}" in
+    --live) live=true ;;
+    --dry-run) live=false ;;
+  esac
+
+  "$DEV" up
+
+  # Only one motor driver can run. A motor panel or a launch left over from a dropped connection would fight this
+  # one for the motors, so offer to stop it first. Both stop their drivers cleanly.
+  stop_leftover motor_panel "A motor panel (./prowl panel) is running. Stop it and start the robot?"
+  if "$DEV" pgrep -f "$LAUNCH" >/dev/null; then
+    confirm "The robot is already running (maybe from a dropped connection). Stop it and start again?" || exit 1
+    "$DEV" bash -c 'pkill -INT -f "$1"
+      for _ in $(seq 100); do pgrep -f "$1" >/dev/null || exit 0; sleep 0.1; done
+      echo "it did not stop within 10 s; stop it by hand" >&2; exit 1' bash "$LAUNCH"
+  fi
+  if "$DEV" pgrep -f '[m]otor_driver_node|[b]ridge/index.js' >/dev/null; then
+    echo "A motor driver or dashboard bridge is already running outside ./prowl. Stop it first:" >&2
+    "$DEV" pgrep -af '[m]otor_driver_node|[b]ridge/index.js' >&2
+    exit 1
+  fi
+
+  if [ -z "$live" ]; then
+    confirm "Should the motors really move (live)?" && live=true || live=false
+  fi
+
+  bridge_packages
+  echo "building the robot's code..."
+  build
+  build_dashboard
+
+  # vite preview serves the build and forwards /ws and /api to the bridge on this Pi (frontend/vite.config.js).
+  "${DOCKER[@]}" rm -f "$WEB" >/dev/null 2>&1 || true
+  if ss -ltn | grep -q ":$PORT\b"; then
+    echo "Port $PORT is already in use (an \`npm run dev\` still running?). Stop it first." >&2
+    exit 1
+  fi
+  "${DOCKER[@]}" run -d --rm --name "$WEB" --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
+    -e PROWL_ROBOT="http://127.0.0.1:$BRIDGE_PORT" -v "$FRONTEND:/fe" -w /fe --entrypoint bash "$IMAGE" \
+    -c "exec npx vite preview --host 0.0.0.0 --port $PORT --strictPort" >/dev/null
+  trap cleanup EXIT
+  # Ctrl-C goes to the launch, which stops every node cleanly; this script then cleans up after it.
+  trap 'true' INT
+  for _ in $(seq 30); do
+    curl -sf -o /dev/null "http://127.0.0.1:$PORT/" && break
+    sleep 0.5
+  done
+  if ! curl -sf -o /dev/null "http://127.0.0.1:$PORT/"; then
+    echo "The dashboard's web server didn't start:" >&2
+    "${DOCKER[@]}" logs "$WEB" >&2 || true
+    exit 1
+  fi
+
+  # Once the bridge answers, everything is up: say where the dashboard is, after the launch's start-up messages.
+  (
+    for _ in $(seq 120); do
+      if curl -sf -o /dev/null "http://127.0.0.1:$BRIDGE_PORT/health"; then
+        banner "$live"
+        exit 0
+      fi
+      sleep 0.5
+    done
+    printf '\r\n%s\r\n' "The robot's bridge hasn't answered on port $BRIDGE_PORT for a minute: look for errors above."
+  ) &
+  WAITER=$!
+
+  echo "Starting the robot. Keep it still for 2 s while the IMU calibrates."
+  "$DEV" ros2 launch prowl_dashboard_bridge robot.launch.py "live:=$live"
+}
+
+panel() {
+  "$DEV" up
+  stop_leftover motor_panel "A motor panel is already running (maybe from a dropped connection). Stop it and open a new one?"
+  echo "building the motor driver..."
+  build --packages-select prowl_motor_driver
+  exec "$DEV" ros2 run prowl_motor_driver motor_panel
+}
+
+lidar() {
+  "$DEV" up
+  stop_leftover ld19_tui "A LiDAR viewer is already running (maybe from a dropped connection). Stop it and open a new one?"
+  # The driver opens the serial port for exclusive use, as the viewer does.
+  if "$DEV" pgrep -f '[l]ib/prowl_ld19_driver/ld19_node' >/dev/null; then
+    echo "The LiDAR driver is reading the sensor (is ./prowl running?). Stop it first." >&2
+    exit 1
+  fi
+  echo "building the LiDAR driver..."
+  build --packages-select prowl_ld19_driver
+  exec "$DEV" install/prowl_ld19_driver/lib/prowl_ld19_driver/ld19_tui "$@"
+}
+
+imu() {
+  "$DEV" up
+  # Two readers would steal each other's data-ready flags.
+  stop_leftover mpu6050_tui "An IMU monitor is already running (maybe from a dropped connection). Stop it and open a new one?"
+  if "$DEV" pgrep -f '[l]ib/prowl_mpu6050_driver/mpu6050_node' >/dev/null; then
+    echo "The IMU driver is reading the sensor (is ./prowl running?). Stop it first." >&2
+    exit 1
+  fi
+  echo "building the IMU driver..."
+  build --packages-select prowl_mpu6050_driver
+  exec "$DEV" install/prowl_mpu6050_driver/lib/prowl_mpu6050_driver/mpu6050_tui "$@"
+}
+
+case "${1:-}" in
+  "" | --live | --dry-run) robot "$@" ;;
+  panel) panel ;;
+  lidar) shift && lidar "$@" ;;
+  imu) shift && imu "$@" ;;
+  dev) shift && exec "$DEV" "$@" ;;
+  help | -h | --help) usage ;;
+  *)
+    usage >&2
+    exit 1
+    ;;
+esac
