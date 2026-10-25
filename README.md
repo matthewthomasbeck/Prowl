@@ -21,13 +21,13 @@ We used ROS2 (Robot Operating System 2) extensively for this project, it was use
 
 Each of the peripherals are connected to a raspberry pi in different ways. We will go over how the pi reads its data from each of its peripherals in this section!
 
-## LIDAR - LD19
+- LIDAR - LD19
 The LD19 LIDAR unit is connected to the RX port of the raspberry pi over UART. It reads data from the sensors and scans them using the `/scan` topic. This is used to send data to the dashboard where you can see the nearest objects to the LD19!
 
-## IMU - MPU6050
+- IMU - MPU6050
 The MPU6050 unit is connected to the pi over a data line and clock line, located at pins 3 and 5. it sends data using the `/imu/data_raw` topic, which is then read on the dashboard.
 
-## DCMC x 2 - DC5-12V 0A-30A
+- DCMC x 2 - DC5-12V 0A-30A
 The DCMCs are used for motor control, they use the `/cmd_vel` and  `/wheel_cmd` topics to communicate with the dashboard, `cmd_vel` stands for "command velocity" and tells all four motors to move forward together. `wheel_cmd` stands for "wheel command" and tells a specific motor to move at a certain velocity.
 
 # Dashboard
