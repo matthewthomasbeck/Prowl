@@ -1,0 +1,40 @@
+brain:
+  ros__parameters:
+    # ---- Startup ----
+    driver_wait_timeout: 30.0     # s to wait for all drivers to start talking before giving up
+                                  # (the IMU alone takes ~2 s to calibrate its gyro first)
+    require_motor_driver: true    # also wait for /motor_status from the motor driver
+    expected_bins: 720            # LiDAR slices per spin; must match the LD19 driver's `bins`
+
+    # ---- State machine (thread 1) ----
+    sensor_timeout: 0.5           # s of silence from the LiDAR or IMU before going to SensorLost
+    match_timeout: 1.0            # s without a good match while Tracking before worrying
+
+    # ---- Scan matcher (thread 2) ----
+    matcher_rate: 10.0            # Hz; the LD19 makes 10 spins a second, so faster gains nothing
+
+    # THE TUNING KNOBS: how much each source counts. Only the ratios matter.
+    # The LiDAR is the boss; the IMU only nudges. Change live with e.g.
+    #   docker/dev.sh ros2 param set /brain imu_yaw_weight 0.5
+    # 0 switches a source off completely.
+    lidar_weight: 10.0            # LiDAR dots landing on walls in the map
+    imu_yaw_weight: 1.0           # the gyro's guess of how far we turned (drifts with temperature)
+    motion_translation_weight: 0.5  # "keep sliding the way you were sliding"
+
+    max_iterations: 20            # max Ceres steps per match
+    max_solve_time: 0.05          # s per match; must stay well under 1 / matcher_rate
+    point_stride: 1               # use every Nth LiDAR bin (2 = half the dots, ~twice as fast)
+    outlier_scale: 0.3            # Huber loss: dots landing where the map is under (1 - this) wall-ish
+                                  # count less; 0 = off. Independent of lidar_weight.
+
+    # ---- Map (thread 2) ----
+    map_resolution: 0.05          # m per cell
+    map_size: 20.0                # m, square, centered where the robot started
+    map_hit_increment: 0.35       # how much "more wall" a cell gets when a beam ends in it
+    map_miss_decrement: 0.1       # how much "less wall" a cell gets when a beam passes through
+
+    # ---- Output ----
+    map_frame: map                # frame_id of /robot_pose
+    display: true                 # show the map full screen on the robot's LCD, if there is one
+    display_rate: 5.0             # Hz the screen is redrawn (each frame costs thread 1 a few ms)
+    stats_period: 5.0             # s between stats log lines, 0 = off
