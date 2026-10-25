@@ -8,70 +8,54 @@
 }
 
 /* ---- Page layout ----
-   .workspace is a CSS grid. By default (phone) it is one column.
-   Bigger screens place each panel in the grid, and the desktop version lets the
-   findings, camera and inspector float over the edges of the big map "world". */
+   .workspace is a CSS grid. By default (phone) it is one column. Bigger screens put the camera panel
+   beside the map, and the desktop version lets it float over the edge of the big map "world". */
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
-/* ---- Phone (under 720px): the Map / Findings / Review tabs choose what is shown ---- */
+/* ---- Phone (under 720px): the map page is just the map; the camera has its own page (the tabs) ---- */
 @media (max-width: 719px) {
   .app {
     padding: 8px 12px 16px;
   }
 
-  .workspace[data-tab='map'] > :is(.findings-panel, .inspector, .camera-panel, .activity-strip),
-  .workspace[data-tab='findings'] > :is(.map-panel, .selection-bar, .inspector, .camera-panel, .activity-strip),
-  .workspace[data-tab='review'] > :is(.map-panel, .selection-bar, .findings-panel) {
+  .workspace > .camera-panel {
     display: none;
   }
 }
 
-/* ---- iPad (720px to 1099px): big map, points of interest beside it, details in a drawer ---- */
+/* ---- iPad (720px to 1099px): big map, the camera panel beside its lower end ---- */
 @media (min-width: 720px) {
   .workspace {
     grid-template-columns: minmax(0, 1fr) 260px;
-    grid-template-areas:
-      'map findings'
-      'map camera'
-      'selection selection'
-      'activity activity';
+    grid-template-areas: 'map camera';
     align-items: start;
   }
 
   .map-panel {
     grid-area: map;
   }
-  .findings-panel {
-    grid-area: findings;
-  }
   .camera-panel {
     grid-area: camera;
-  }
-  .selection-bar {
-    grid-area: selection;
-  }
-  .activity-strip {
-    grid-area: activity;
+    align-self: end;
   }
 }
 
-/* ---- Desktop (1100px and wider): the map is the whole game world, with panels floating over its sides ----
-   Columns: left HUD | free space for the map | right HUD.
-   The map panel spans all three columns; the other panels sit on top of its left and right edges. */
+/* ---- Desktop (1100px and wider): the map is the whole game world, with the camera panel floating over it ----
+   Columns: left HUD | the rest. The map panel spans both columns; the camera panel sits on top of its
+   lower left corner. */
 @media (min-width: 1100px) {
   .app {
     padding: 12px 20px 10px;
   }
 
   .workspace {
-    /* the floating panels get a little narrower on smaller screens, so the map keeps more room */
-    --hud-left: clamp(230px, 20vw, 280px);
-    --hud-right: clamp(290px, 25vw, 340px);
-    grid-template-columns: var(--hud-left) minmax(0, 1fr) var(--hud-right);
+    /* the floating panel gets a little narrower on smaller screens, so the map keeps more room */
+    --hud: clamp(230px, 20vw, 280px);
+    grid-template-columns: var(--hud) minmax(0, 1fr);
     grid-template-areas: none;
     align-items: stretch;
   }
@@ -82,25 +66,12 @@
     grid-column: 1 / -1;
     grid-row: 1 / 3;
     min-height: 540px;
-    /* keep the map itself clear of the floating panels */
-    padding-inline: calc(var(--hud-left) + 20px) calc(var(--hud-right) + 20px);
+    /* keep the map itself clear of the floating panel, and in the middle of the page */
+    padding-inline: calc(var(--hud) + 20px);
   }
 
-  .workspace .findings-panel,
-  .workspace .camera-panel,
-  .workspace .inspector {
+  .workspace .camera-panel {
     z-index: 2;
-    /* these float over the map area, which is already dimmed a little, so they dim less */
-    --glass-dim: 0.8;
-  }
-
-  .findings-panel {
-    grid-area: auto;
-    grid-column: 1;
-    grid-row: 1;
-    align-self: start;
-    max-height: calc(100% - 12px);
-    margin: 12px 0 0 12px;
   }
 
   .camera-panel {
@@ -108,19 +79,6 @@
     grid-column: 1;
     grid-row: 2;
     margin: 0 0 12px 12px;
-  }
-
-  .inspector {
-    grid-area: auto;
-    grid-column: 3;
-    grid-row: 1 / 3;
-    margin: 12px 12px 12px 0;
-  }
-
-  .activity-strip {
-    grid-area: auto;
-    grid-column: 1 / -1;
-    grid-row: 3;
   }
 }
 
@@ -133,15 +91,16 @@
   .workspace {
     flex: 1;
     min-height: 0;
-    grid-template-rows: minmax(0, 1fr) auto auto;
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 }
 
 /* ---- Shared panel look: borderless, floating on the photo ----
    A panel has no box, no outline and no background of its own. Behind its content, ::after
-   adds a soft dimming-and-blurring layer. That layer is a little bigger than the panel
-   and fades out at its edges, so there is no visible edge: the content just floats, and the
-   picture behind it is calmer where the text is. */
+   adds a soft dark tint. That layer is a little bigger than the panel and fades out at its
+   edges, so there is no visible edge: the content just floats, and the picture behind it is
+   calmer where the text is. (The picture isn't blurred: re-blurring it for every new reading
+   from the robot made the page lag.) */
 .panel {
   --panel-fill: var(--panel);
 
@@ -163,8 +122,6 @@
   inset: -10px;
   z-index: -1;
   background: var(--panel-fill);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.1) brightness(var(--glass-dim));
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.1) brightness(var(--glass-dim));
   /* fade out toward every edge: one fade left-to-right and one top-to-bottom, combined */
   -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent),
     linear-gradient(to bottom, transparent, #000 14px, #000 calc(100% - 14px), transparent);
@@ -282,8 +239,6 @@
   max-width: 100%;
   padding: 3px 10px;
   background: rgba(6, 8, 11, 0.62);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
   font-size: 11px;
   line-height: 1.4;
   color: var(--muted);

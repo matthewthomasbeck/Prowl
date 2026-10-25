@@ -3,14 +3,12 @@ import './LidarScope.css'
 import { useLiveValue } from '../live/useProwlLink.js'
 
 // ---- The LiDAR scope: what the robot's LiDAR sees right now, around the robot ----
-// Robot only (the dashboard bridge). The robot doesn't map the area or track where it is, so this is not a map:
-// the robot stays in the middle, facing up, and the scan points are drawn around it. Like a radar screen,
-// the last few scans stay on screen and fade, so walls read as solid lines and a moving person leaves a short
-// trail.
+// The robot doesn't map the area or track where it is, so this is not a map: the robot stays in the middle, facing
+// up, and the scan points are drawn around it. Like a radar screen, the last few scans stay on screen and fade, so
+// walls read as solid lines and a moving person leaves a short trail.
 //
-// link: from useProwlLink. The scan ({ points: [[x, y], ...] } in metres, map frame) is read here with useLiveValue,
-// so a new scan re-draws only the scope. link.pose: { x, y, theta } or null; without one the robot is at the map
-// origin facing +x, which is how the bridge placed the points.
+// link: from useProwlLink. The scan ({ points: [[x, y], ...] } in metres around the robot, x forward and y left) is
+// read here with useLiveValue, so a new scan re-draws only the scope.
 // scanAge: seconds since the last scan arrived (null = never), from the robot's status message.
 
 const TRAIL = 5 // how many scans stay on screen, newest brightest
@@ -19,18 +17,6 @@ const RINGS = { 2: 0.5, 4: 1, 8: 2 } // metres between distance rings, for each 
 const RATIO = 1.5 // the same 3:2 box as the map
 const CLOSE_M = 0.4 // nearer than this, a side's clearance is flagged
 const STALE_S = 2
-
-// Scan points in the robot's own frame: x forward, y left.
-function aroundRobot(points, pose) {
-  const p = pose || { x: 0, y: 0, theta: 0 }
-  const cos = Math.cos(p.theta)
-  const sin = Math.sin(p.theta)
-  return points.map(([x, y]) => {
-    const dx = x - p.x
-    const dy = y - p.y
-    return [dx * cos + dy * sin, -dx * sin + dy * cos]
-  })
-}
 
 // The nearest return in front, to the left, to the right and behind (each a quarter turn), or null.
 function clearance(points) {
@@ -105,14 +91,13 @@ function ScanDots({ history, range, width }) {
 
 function LidarScope({ link, scanAge }) {
   const scan = useLiveValue(link, 'scan')
-  const pose = link.pose
   const [range, setRange] = useState(4)
   // Keeps the last few scans. Like the map's fly-to, this adjusts state while rendering when the scan changes.
   const [history, setHistory] = useState([])
   const [seenScan, setSeenScan] = useState(null)
   if (scan !== seenScan) {
     setSeenScan(scan)
-    if (scan) setHistory((current) => [aroundRobot(scan.points, pose), ...current].slice(0, TRAIL))
+    if (scan) setHistory((current) => [scan.points, ...current].slice(0, TRAIL))
   }
 
   const width = range * RATIO

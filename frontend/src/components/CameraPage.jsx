@@ -3,17 +3,17 @@ import './CameraPage.css'
 import SectionIcon from './SectionIcon.jsx'
 
 // ---- The Camera page: the robot's live camera, and taking full-resolution photos ----
-// Robot only (the dashboard bridge). It's a page of its own, so the video only plays while someone is looking at it,
-// and the map page doesn't have to draw it too.
-//   available: is the dashboard connected to the robot with a camera?
+// It's a page of its own, so the video only plays while someone is looking at it, and the map page doesn't have to
+// draw it too.
+//   available: is the dashboard connected to the robot?
 //   still: the newest photo, from useProwlLink (cameraStill), whoever took it.
 //   cameraAge: seconds since the robot's last video frame (null = the camera driver never sent one).
 //   onOpenPhotos(): open the Photos page. onBack(): back to the map page.
 //
 // The video is pulled one frame at a time from /api/camera/frame.jpg: the next one is asked for only once the last
-// one is on screen. The bridge also has an MJPEG stream (/api/camera/video.mjpg), but a stream keeps sending
-// whether or not the browser keeps up, so on a slow link, a busy computer or through the dashboard's web server
-// the frames pile up on the way and the picture falls seconds behind. Pulling never gets more than one frame behind.
+// one has arrived. A stream (MJPEG) would keep sending whether or not the browser keeps up, so on a slow link, a busy
+// computer or through the dashboard's web server the frames would pile up on the way and the picture would fall
+// seconds behind. Pulling never gets more than one frame behind.
 
 const FRAME_URL = '/api/camera/frame.jpg'
 const FRAME_MS = 1000 / 15 // at most 15 frames a second, like the robot's own stream

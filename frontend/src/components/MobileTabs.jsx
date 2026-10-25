@@ -1,23 +1,16 @@
 import './MobileTabs.css'
 
-const tabs = [
-  { id: 'map', label: 'Map' },
-  { id: 'findings', label: 'Findings' },
-  { id: 'review', label: 'Review' },
-]
-
-// Only shown on phones. It decides which part of the dashboard is on screen.
-// extraTabs (robot only): more tabs after these, for the robot's own pages, e.g. [{ id: 'camera', label: 'Camera' }].
-function MobileTabs({ activeTab, onChange, extraTabs = [] }) {
-  const shown = [...tabs, ...extraTabs]
+// Only shown on phones, in place of the header's row of page tabs. pages: [{ id, label }]; page is the open one,
+// and onPage(id) opens another.
+function MobileTabs({ pages, page, onPage }) {
   return (
-    <nav className="mobile-tabs" aria-label="Dashboard sections" data-count={shown.length}>
-      {shown.map((tab) => (
+    <nav className="mobile-tabs" aria-label="Pages">
+      {pages.map((tab) => (
         <button
           key={tab.id}
-          className={tab.id === activeTab ? 'mobile-tab active' : 'mobile-tab'}
-          onClick={() => onChange(tab.id)}
-          aria-current={tab.id === activeTab ? 'page' : undefined}
+          className={tab.id === page ? 'mobile-tab active' : 'mobile-tab'}
+          onClick={() => onPage(tab.id)}
+          aria-current={tab.id === page ? 'page' : undefined}
         >
           {tab.label}
         </button>

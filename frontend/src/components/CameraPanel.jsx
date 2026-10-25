@@ -1,16 +1,16 @@
 import './CameraPanel.css'
 import SectionIcon from './SectionIcon.jsx'
 
-// Without the robot: a small empty "screen" and a message. There is no video.
-// Connected straight to the robot (the robot prop): a button to the Camera page, where the live video is, and the
-// newest photo, which opens the Photos page. The video isn't played here, so the map page stays light.
+// Before the robot answers: a small empty "screen" and a message. There is no video.
+// Connected to the robot (the robot prop): a button to the Camera page, where the live video is, and the newest
+// photo, which opens the Photos page. The video isn't played here, so the map page stays light.
 //   robot: { still, cameraAge, onOpenCamera, onOpenPhotos } or null
 //     still: the newest photo, from useProwlLink (cameraStill). cameraAge: seconds since the last video frame
 //     (null = the camera driver never sent one).
 
 const STALE_S = 2
 
-function CameraPanel({ message = 'Camera offline — awaiting robot connection.', robot = null }) {
+function CameraPanel({ robot = null }) {
   if (!robot) {
     return (
       <section className="panel camera-panel">
@@ -24,7 +24,7 @@ function CameraPanel({ message = 'Camera offline — awaiting robot connection.'
             <SectionIcon name="camera" />
             Rover camera
           </h2>
-          <p className="camera-message">{message}</p>
+          <p className="camera-message">Camera offline — awaiting robot connection.</p>
         </div>
       </section>
     )

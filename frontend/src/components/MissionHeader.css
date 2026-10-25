@@ -1,5 +1,5 @@
 /* The header has no box. Its items float straight on the photo.
-   A soft dimming strip behind it (fading out toward the bottom) keeps the text readable. */
+   A soft dark strip behind it (fading out toward the bottom) keeps the text readable. */
 .topbar {
   position: relative;
   isolation: isolate;
@@ -19,8 +19,6 @@
   inset: -12px -4px -14px;
   z-index: -1;
   background: linear-gradient(rgba(5, 7, 10, 0.4), rgba(5, 7, 10, 0));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) brightness(var(--glass-dim));
-  backdrop-filter: blur(var(--glass-blur)) brightness(var(--glass-dim));
   /* fade out toward the bottom and toward both sides, so there is no visible edge */
   -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent),
     linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
@@ -103,8 +101,8 @@
   margin-left: 8px;
 }
 
-/* The robot's pages: a row of tabs across the bottom of the header, in the style of the map's Map / LiDAR scope
-   switch. The open page is underlined and lit, and marked for screen readers. */
+/* The pages: a row of tabs across the bottom of the header, in the style of the map's Map / LiDAR scope switch.
+   The open page is underlined and lit, and marked for screen readers. */
 .page-nav {
   display: flex;
   gap: 2px;
@@ -155,8 +153,8 @@
   color: #0a0c0e;
 }
 
-/* The simulation label is the most obvious thing in the bar */
-.sim-label {
+/* The connection label is the most obvious thing in the bar */
+.connection-label {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -170,32 +168,20 @@
 }
 
 /* Live data: the dot fills in with the accent color (the words still say what is connected) */
-.sim-label.live {
+.connection-label.live {
   border-color: var(--green);
 }
 
-.sim-label.live .sim-icon {
+.connection-label.live .connection-dot {
   border-color: var(--green);
   background: var(--green);
 }
 
-.sim-icon {
+.connection-dot {
   width: 10px;
   height: 10px;
   border: 2px solid var(--text);
   border-radius: 50%;
-  animation: sim-pulse 2.4s ease-in-out infinite;
-}
-
-/* A slow pulse on the dot says "this indicator is live", while the text says it is a simulation */
-@keyframes sim-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.3;
-  }
 }
 
 @media (max-width: 719px) {
@@ -214,7 +200,7 @@
     border-left: 0;
   }
 
-  .sim-label {
+  .connection-label {
     width: 100%;
     margin-left: 0;
   }

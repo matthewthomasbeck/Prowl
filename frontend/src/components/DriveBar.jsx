@@ -3,8 +3,8 @@ import './DriveBar.css'
 import { useLiveValue } from '../live/useProwlLink.js'
 
 // ---- Remote control: a bar along the bottom of every page, like a game's controls ----
-// Robot only (the dashboard bridge). App keeps one of these under whichever page is open, so the keyboard switch
-// stays as it is when the page changes. The robot moves only while a key or button is held: src/live/useDrive.js
+// App keeps one of these under whichever page is open (once the robot has answered), so the keyboard switch stays
+// as it is when the page changes. The robot moves only while a key or button is held: src/live/useDrive.js
 // repeats the command 10 times a second and sends a zero when it's let go, when the window loses focus or when
 // the tab is hidden. Stop always works, even while another dashboard is driving.
 // Commands are always full speed: on Prowl's wheels, driving slowly is harder on them than driving fast.
@@ -14,14 +14,14 @@ import { useLiveValue } from '../live/useProwlLink.js'
 //   error: the newest drive error from the robot (e.g. "another dashboard is driving"), or null.
 //   link: from useProwlLink, for the wheel duties and the IMU, which only their own readouts re-draw for (they change
 //   10 and 5 times a second). topicAges: status.topic_age_s, seconds since each topic arrived.
-//   motors: status.motors, whether driving reaches the wheels: 'live', 'dry_run', null (the motor driver isn't
-//   answering), or undefined (an older bridge that doesn't say).
+//   motors: status.motors, whether driving reaches the wheels: 'live', 'dry_run', or null (the motor driver isn't
+//   answering).
 
 const STALE_S = 2
 
 // Why the robot won't move even though the controls work
 const MOTOR_WARNINGS = {
-  dry_run: "Motors in dry run: the wheel readout responds, but the robot won't move. Restart the robot's launch with live:=true.",
+  dry_run: "Motors in dry run: the wheel readout responds, but the robot won't move. Restart it with ./prowl --live.",
   null: "The motor driver isn't answering, so the robot can't move.",
 }
 
@@ -267,7 +267,7 @@ function DriveBar({ drive, canCommand, onToken, error, link, topicAges, motors }
           <span className="drive-dot" aria-hidden="true"></span>
           {readout}
         </p>
-        {motors !== undefined && MOTOR_WARNINGS[motors] && <p className="drive-error">⚠ {MOTOR_WARNINGS[motors]}</p>}
+        {MOTOR_WARNINGS[motors] && <p className="drive-error">⚠ {MOTOR_WARNINGS[motors]}</p>}
         {error && <p className="drive-error">⚠ {error}</p>}
         <p className="drive-hint">
           {keyboardOn ? 'Hold W S to drive, A D to slide, Q E or ← → to turn. Space stops.' : 'Hold a button to move. Let go to stop.'}

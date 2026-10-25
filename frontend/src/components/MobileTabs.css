@@ -9,8 +9,6 @@
   padding: 4px;
   border: 0;
   background: rgba(7, 10, 13, 0.7); /* no outline, but enough tint that scrolling content never shows through the tabs */
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
 }
 
 .mobile-tab {
@@ -30,12 +28,6 @@
   border-bottom-color: var(--green);
   background: var(--green-dim);
   color: var(--text);
-}
-
-/* Five tabs (with the robot's Camera and Photos) need smaller words to fit a phone */
-.mobile-tabs[data-count='5'] .mobile-tab {
-  font-size: 11px;
-  letter-spacing: 0.04em;
 }
 
 @media (min-width: 720px) {
