@@ -2,11 +2,12 @@
 
 <div align="center">
   <img src="images/prototype-1.jpg" alt="Robot prototype" width="600">
-  <img src="images/frontend-lidar_screen.jpg" alt="Frontend Lidar" width="600">
-  <img src="images/frontend-video_screen.jpg" alt="Frontend Video" width="600">
+  <br>
+  <img src="images/frontend-lidar_screen.jpg" alt="Frontend Lidar" width="400">
+  <img src="images/frontend-video_screen.jpg" alt="Frontend Video" width="400">
 
-  <br><br>
-  A Rover designed to help map terrain on the moon.<br><br>
+  <br>
+  A Rover designed to help explore and image terrain on the moon.<br><br>
   Developed for the 2026 GeauxHack Hackathon at LSU!
 </div>
 
