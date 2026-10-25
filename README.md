@@ -40,6 +40,42 @@ The DCMCs are used for motor control, they use the `/cmd_vel` and  `/wheel_cmd` 
 # Dashboard
 The dashboard is connected through a ROS2 wrapper for Node.js, which allows it to communicate with the frontend easily, the front end is able to act as a publisher and subscriber, meaning it can send topics and recieve them just like any other peripheral!
 
+# Credits
+<div align="center">
+  We'd like to thank the following members of our team for their great work on this project!
+  <br>
+  <img src="images/nyla_working.jpg" alt="Frontend Lidar" width="400">
+  <br>
+  Nyla Rivarde
+  <br>
+  Dashboard: camera view, remote control and alert
+
+  <br>
+
+  <img src="images/matthew_working.jpg" alt="Frontend Lidar" width="400">
+  <br>
+  Matthew Beck
+  <br>
+  Hardware, engineering and DevOps
+
+  <br>
+
+  <img src="images/ishaan_working.jpg" alt="Frontend Lidar" width="400">
+  <br>
+  Ishaan Acharya
+  <br>
+  Backend integration layer, WebSocket backend
+
+  <br>
+
+  <img src="images/weien_working.jpg" alt="Frontend Lidar" width="400">
+  <br>
+  WeiEn Greathouse
+  <br>
+  ROS2 hookup, drivers, and this README :)
+  
+</div>
+
 # AI assistance
 Significant portions of the edge code and other documents in the repo were written with help from an AI coding assistant (Claude Code, by Anthropic) during the hackathon, with team members directing the work and testing it on the robot. No code was copied or adapted from other projects; the drivers are written from the hardware datasheets and API documentation.
 
