@@ -43,9 +43,9 @@ The dashboard is connected through a ROS2 wrapper for Node.js, which allows it t
 # Credits
 <div align="center">
   We'd like to thank the following members of our team for their great work on this project!
-  <br>
+  <br> <br>
   <img src="images/nyla_working.jpg" alt="Frontend Lidar" width="400">
-  <br>
+  <br><br>
   Nyla Rivarde
   <br>
   Dashboard: camera view, remote control and alert
@@ -53,7 +53,7 @@ The dashboard is connected through a ROS2 wrapper for Node.js, which allows it t
   <br>
 
   <img src="images/matthew_working.jpg" alt="Frontend Lidar" width="400">
-  <br>
+  <br><br>
   Matthew Beck
   <br>
   Hardware, engineering and DevOps
@@ -61,14 +61,14 @@ The dashboard is connected through a ROS2 wrapper for Node.js, which allows it t
   <br>
 
   <img src="images/ishaan_working.jpg" alt="Frontend Lidar" width="400">
-  <br>
+  <br><br>
   Ishaan Acharya
   <br>
   Backend integration layer, WebSocket backend
-
   <br>
 
   <img src="images/weien_working.jpg" alt="Frontend Lidar" width="400">
+  <br>
   <br>
   WeiEn Greathouse
   <br>
