@@ -1,6 +1,6 @@
 # Prowl
 <div align="center">
-  A Rover designed to help map terrain on the moon.<br>
+  A Rover designed to help map terrain on the moon.<br><br>
   Developed for the 2026 GeauxHack Hackathon at LSU!
 </div>
 
