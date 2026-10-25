@@ -1,4 +1,6 @@
+<div align="center">
 # Prowl
+</div>
 
 <div align="center">
   <img src="images/prototype-1.jpg" alt="Robot prototype" width="600">
