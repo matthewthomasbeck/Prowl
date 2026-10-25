@@ -10,7 +10,7 @@
 namespace prowl_camera_driver
 {
 
-// JPEG encoding and YUV -> RGB conversion with TurboJPEG (libjpeg-turbo's simple API).
+// JPEG encoding with TurboJPEG (libjpeg-turbo's simple API).
 //
 // The input is full-range BT.601 YUV (libcamera's sYCC colour space), which is exactly what JPEG
 // stores, so encoding needs no colour conversion: the planes go straight to the DCT.
@@ -28,17 +28,15 @@ public:
   // of `jpeg`. Returns false and sets `error` on failure.
   bool encode(const YuvImage & image, int quality, std::vector<uint8_t> & jpeg, std::string & error);
 
-  // Converts to packed RGB, 3 bytes per pixel with no row padding (sensor_msgs "rgb8").
-  bool toRgb(const YuvImage & image, std::vector<uint8_t> & rgb, std::string & error);
-
-  // Decodes a JPEG to packed RGB. Not needed by the driver; the tests use it to check encode().
+  // Decodes a JPEG to packed RGB, 3 bytes per pixel. Not needed by the driver; the tests use it to check
+  // encode().
   bool decode(
     const uint8_t * data, size_t size, int & width, int & height, std::vector<uint8_t> & rgb,
     std::string & error);
 
 private:
   void * compressor_ = nullptr;    // tjhandle
-  void * decompressor_ = nullptr;  // tjhandle; TurboJPEG's YUV -> RGB lives on the decompressor
+  void * decompressor_ = nullptr;  // tjhandle, for decode()
 };
 
 }  // namespace prowl_camera_driver

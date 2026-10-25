@@ -76,24 +76,6 @@ bool Jpeg::encode(const YuvImage & image, int quality, std::vector<uint8_t> & jp
   return true;
 }
 
-bool Jpeg::toRgb(const YuvImage & image, std::vector<uint8_t> & rgb, std::string & error)
-{
-  if (!validImage(image, error)) {
-    return false;
-  }
-  const unsigned char * planes[3] = {image.y, image.u, image.v};
-  const int strides[3] = {image.y_stride, image.uv_stride, image.uv_stride};
-  rgb.resize(static_cast<size_t>(image.width) * image.height * 3);
-  if (tjDecodeYUVPlanes(
-      static_cast<tjhandle>(decompressor_), planes, strides, TJSAMP_420, rgb.data(), image.width,
-      image.width * 3, image.height, TJPF_RGB, 0) != 0)
-  {
-    error = tjError(decompressor_);
-    return false;
-  }
-  return true;
-}
-
 bool Jpeg::decode(
   const uint8_t * data, size_t size, int & width, int & height, std::vector<uint8_t> & rgb,
   std::string & error)
