@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Manage the ROS2 dev container for the Prowl edge drivers.
+# Manage the ROS2 dev container for Prowl's robot code (the workspace is edge/, mounted at /ws).
+# From the repo root, ./prowl dev <args> is the same as edge/docker/dev.sh <args>.
 #
-#   docker/dev.sh image          build the image
-#   docker/dev.sh up             start the container (host network, workspace at /ws)
-#   docker/dev.sh down           remove the container
-#   docker/dev.sh shell          interactive shell inside it
-#   docker/dev.sh <cmd...>       run any command inside it with ROS sourced, e.g.
-#                                  docker/dev.sh colcon build
-#                                  docker/dev.sh ros2 launch prowl_motor_driver motor_driver.launch.py
+#   dev.sh image          build the image
+#   dev.sh up             start the container (host network, workspace at /ws)
+#   dev.sh down           remove the container
+#   dev.sh shell          interactive shell inside it
+#   dev.sh <cmd...>       run any command inside it with ROS sourced, e.g.
+#                           dev.sh colcon build
+#                           dev.sh ros2 launch prowl_motor_driver motor_driver.launch.py
 #
 # The motor driver talks to the host's pigpiod over localhost:8888, which is why
 # the container shares the host network.
@@ -75,7 +76,7 @@ case "${1:-}" in
     "${DOCKER[@]}" exec "${TTY[@]}" "$CONTAINER" bash
     ;;
   "")
-    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
     ;;
   *)

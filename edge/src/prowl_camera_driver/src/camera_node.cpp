@@ -13,7 +13,6 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/compressed_image.hpp>
-#include <sensor_msgs/msg/image.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
 #include "prowl_camera_driver/jpeg.hpp"
@@ -27,7 +26,6 @@ namespace
 {
 
 using sensor_msgs::msg::CompressedImage;
-using sensor_msgs::msg::Image;
 using std_srvs::srv::Trigger;
 
 constexpr auto kFrameTimeout = std::chrono::milliseconds(500);
@@ -45,7 +43,6 @@ int64_t clockNs(clockid_t clock)
 
 // Runs the camera on a background thread and publishes:
 //   camera/image_raw/compressed  JPEG video, every frame
-//   camera/image_raw             the same frames as rgb8, only while something subscribes
 //   camera/still/compressed      a full-resolution JPEG each time camera/capture is called
 // The camera is reopened every second while it is missing or failing, so the node can start
 // before the camera works.
@@ -92,7 +89,6 @@ public:
     setenv("LIBCAMERA_LOG_LEVELS", ("*:" + log_level).c_str(), 0);
 
     jpeg_pub_ = create_publisher<CompressedImage>("camera/image_raw/compressed", rclcpp::SensorDataQoS());
-    raw_pub_ = create_publisher<Image>("camera/image_raw", rclcpp::SensorDataQoS());
     // Kept for late subscribers, such as a dashboard bridge started after the picture was taken.
     still_pub_ = create_publisher<CompressedImage>(
       "camera/still/compressed", rclcpp::QoS(1).reliable().transient_local());
@@ -211,22 +207,6 @@ private:
     jpeg_bytes_ += msg->data.size();
     jpeg_pub_->publish(std::move(msg));
     ++frames_;
-
-    // Converting to RGB costs about as much as the JPEG, so only do it for someone.
-    if (raw_pub_->get_subscription_count() > 0) {
-      auto raw = std::make_unique<Image>();
-      raw->header.stamp = stamp;
-      raw->header.frame_id = frame_id_;
-      raw->width = static_cast<uint32_t>(frame.image.width);
-      raw->height = static_cast<uint32_t>(frame.image.height);
-      raw->encoding = "rgb8";
-      raw->step = raw->width * 3;
-      if (jpeg.toRgb(frame.image, raw->data, error)) {
-        raw_pub_->publish(std::move(raw));
-      } else {
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 10000, "couldn't convert a frame to RGB: %s", error.c_str());
-      }
-    }
   }
 
   void serveCaptures(Jpeg & jpeg)
@@ -340,7 +320,6 @@ private:
   uint64_t last_dropped_ = 0;
 
   rclcpp::Publisher<CompressedImage>::SharedPtr jpeg_pub_;
-  rclcpp::Publisher<Image>::SharedPtr raw_pub_;
   rclcpp::Publisher<CompressedImage>::SharedPtr still_pub_;
   rclcpp::Service<Trigger>::SharedPtr capture_srv_;
   rclcpp::TimerBase::SharedPtr stats_timer_;

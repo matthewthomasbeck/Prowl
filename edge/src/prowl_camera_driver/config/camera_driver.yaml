@@ -2,8 +2,7 @@ camera_driver:
   ros__parameters:
     frame_id: camera_link
 
-    # Video, published as JPEG on /camera/image_raw/compressed (and as rgb8 on /camera/image_raw for
-    # whoever subscribes to it).
+    # Video, published as JPEG on /camera/image_raw/compressed.
     width: 1280
     height: 720
     fps: 30.0

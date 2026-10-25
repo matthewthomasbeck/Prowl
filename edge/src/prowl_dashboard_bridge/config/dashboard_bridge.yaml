@@ -1,7 +1,7 @@
 dashboard_bridge:
   ros__parameters:
     host: 0.0.0.0           # listen on every network interface
-    port: 8000              # same port as the backend, so the dashboard's PROWL_BACKEND setting works for both
+    port: 8000              # the dashboard's web server forwards /ws and /api here (frontend/vite.config.js)
     drive_token: ""         # empty = anyone who can reach the port can drive; set one before using a shared network
 
     # Drive requests are fractions of these top speeds. Write them with a decimal point (1.0, not 1).
@@ -11,21 +11,17 @@ dashboard_bridge:
     angular_speed: 3.34     # rad/s: max_linear_speed / ((wheel_separation + wheel_base) / 2), rounded up
     drive_timeout: 0.3      # s without a drive request before a stop is sent (the motor driver's own is 0.5)
 
-    mission_name: Prowl live
-    # zone: [-7.5, -5.0, 15.0, 10.0]   # survey zone [x, y, width, height] in the map frame, m (3:2 fills the map box)
+    mission_name: Prowl live  # shown as the mission in the dashboard's header
 
-    # Where the LiDAR sits on the robot (base_link), for placing scan points on the map. TODO: measure.
+    # Where the LiDAR sits on the robot (base_link), for placing scan points around the robot. TODO: measure.
     laser_x: 0.0            # m forward
     laser_y: 0.0            # m left
     laser_yaw: 0.0          # rad counter-clockwise
 
     # How often the dashboards get each topic (the newest message wins in between).
     max_scan_points: 180
-    pose_rate: 10.0         # Hz
     scan_rate: 5.0          # Hz
     motor_status_rate: 10.0 # Hz
-    map_period: 1.0         # s
-    camera_rate: 15.0       # Hz, most video frames a second each viewer of /api/camera/video.mjpg gets
     imu_rate: 5.0           # Hz: each imu message is the average of the readings since the last one
 
     stale_after: 2.0        # s: the robot counts as connected while the LiDAR, motors, IMU or camera sent something this recently

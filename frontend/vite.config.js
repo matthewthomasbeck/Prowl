@@ -5,20 +5,21 @@ import { defineConfig, loadEnv } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // During `npm run dev`, requests to /ws and /api are forwarded to the Prowl backend, so the dashboard
-  // can use the same address for everything. By default that's a backend running on this computer.
-  // To use the EC2 server instead, put this line in a file called .env.local next to this one:
-  //   PROWL_BACKEND=http://<ec2-public-ip>:8000
+  // Requests to /ws and /api are forwarded to the robot's dashboard bridge, so the dashboard can use the same
+  // address for everything. ./prowl serves the built dashboard on the robot itself and sets PROWL_ROBOT to the
+  // bridge next to it. To run `npm run dev` on another computer, put this line in a file called .env.local next
+  // to this one:
+  //   PROWL_ROBOT=http://<robot address>:8000
   const env = loadEnv(mode, process.cwd(), '')
-  const backend = env.PROWL_BACKEND || 'http://localhost:8000'
+  const robot = env.PROWL_ROBOT || 'http://localhost:8000'
 
-  // Keeps the connections to the backend (or the robot) open between requests. Without it the proxy closes each one,
-  // and the browser has to open a new connection for every request, e.g. every frame on the robot's Camera page.
-  const agent = new (backend.startsWith('https:') ? https : http).Agent({ keepAlive: true })
+  // Keeps the connections to the robot open between requests. Without it the proxy closes each one, and the
+  // browser has to open a new connection for every request, e.g. every frame on the Camera page.
+  const agent = new (robot.startsWith('https:') ? https : http).Agent({ keepAlive: true })
 
   const proxy = {
-    '/api': { target: backend, changeOrigin: true, agent },
-    '/ws': { target: backend, ws: true, changeOrigin: true },
+    '/api': { target: robot, changeOrigin: true, agent },
+    '/ws': { target: robot, ws: true, changeOrigin: true },
   }
 
   return {

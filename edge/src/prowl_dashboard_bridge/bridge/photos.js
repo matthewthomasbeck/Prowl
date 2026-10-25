@@ -9,9 +9,31 @@
 import { mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { jpegSize } from './camera.js'
 
 const NAME = /^prowl-\d{8}-\d{6}-\d{3}$/
+
+// Width and height from a JPEG's start-of-frame header, or null if it isn't a JPEG.
+export function jpegSize(jpeg) {
+  if (jpeg.length < 4 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8) return null
+  let i = 2
+  while (i + 4 <= jpeg.length) {
+    if (jpeg[i] !== 0xff) return null
+    const marker = jpeg[i + 1]
+    if (marker === 0xff) {
+      i += 1 // fill byte
+      continue
+    }
+    // SOF0-SOF15 are 0xC0-0xCF, except DHT (C4), JPG (C8) and DAC (CC). After the length come the
+    // sample precision (1 byte), then height and width (2 bytes each).
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      if (i + 9 > jpeg.length) return null
+      return { width: jpeg.readUInt16BE(i + 7), height: jpeg.readUInt16BE(i + 5) }
+    }
+    if (marker === 0xd9 || marker === 0xda) return null // end of image, or image data, with no frame header
+    i += 2 + jpeg.readUInt16BE(i + 2)
+  }
+  return null
+}
 
 const round3 = (value) => Math.round(value * 1000) / 1000
 

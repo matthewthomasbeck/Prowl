@@ -3,8 +3,8 @@ import './PhotosPage.css'
 import SectionIcon from './SectionIcon.jsx'
 
 // ---- Mission photos: every full-resolution photo the robot's camera has taken ----
-// Robot only. The photos are kept on the robot (its dashboard bridge saves each one), so every dashboard sees the
-// same list, and they are still there after a reload or a restart. The list comes from GET /api/camera/photos and is
+// The photos are kept on the robot (its dashboard bridge saves each one), so every dashboard sees the same list, and
+// they are still there after a reload or a restart. The list comes from GET /api/camera/photos and is
 // loaded again whenever a photo is taken or deleted (changed goes up).
 //   available: is the dashboard connected to the robot? changed: from useProwlLink (photosChanged).
 //   token: the drive token, which deleting needs if the robot has one. onBack(): back to the dashboard.
@@ -73,7 +73,7 @@ function PhotosPage({ available, changed, token, onBack }) {
   } else if (!photos) {
     body = <p className="photos-empty">Loading the photos…</p>
   } else if (list.length === 0) {
-    body = <p className="photos-empty">No photos yet. Take one with “Take photo” in the Rover camera panel.</p>
+    body = <p className="photos-empty">No photos yet. Take one with “Take photo” on the Camera page.</p>
   } else {
     body = (
       <ul className="photo-grid">

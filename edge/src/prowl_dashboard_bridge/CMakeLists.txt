@@ -8,9 +8,9 @@ find_package(ament_cmake REQUIRED)
 # classes from the sourced ROS install.
 if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/node_modules/rclnodejs/build/Release/rclnodejs.node)
   message(FATAL_ERROR
-    "prowl_dashboard_bridge: npm packages missing. Run, from the workspace:\n"
-    "  docker/dev.sh bash -c 'cd src/prowl_dashboard_bridge && npm ci'\n"
-    "(./prowl does this for you.)")
+    "prowl_dashboard_bridge: npm packages missing. Run, from the repo root:\n"
+    "  ./prowl dev bash -c 'cd src/prowl_dashboard_bridge && npm ci'\n"
+    "(./prowl does this for you when it starts the robot.)")
 endif()
 
 # The app goes under lib/ next to its launcher, so `ros2 run prowl_dashboard_bridge dashboard_bridge` works.

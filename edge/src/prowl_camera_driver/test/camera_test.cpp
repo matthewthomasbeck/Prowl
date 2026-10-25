@@ -1,5 +1,5 @@
-// Hardware-free checks of the camera driver: JPEG encoding and YUV -> RGB from padded planes, and
-// the timing helpers. Exits non-zero if anything fails.
+// Hardware-free checks of the camera driver: JPEG encoding from padded planes, and the timing helpers.
+// Exits non-zero if anything fails.
 
 #include <cmath>
 #include <cstdint>
@@ -139,31 +139,23 @@ void testEncodeGreyRamp()
   }
 }
 
-// Full-range BT.601: pure red is Y 76, U 85, V 255.
-void testToRgbColour()
+// Full-range BT.601: pure red is Y 76, U 85, V 255, and it stays red through a JPEG.
+void testEncodeColour()
 {
   TestPicture pic(63, 47, 10);  // odd sizes, so the last chroma column and row cover one pixel
   pic.fill([](int, int) {return 76;}, 85, 255);
   Jpeg jpeg;
-  std::vector<uint8_t> rgb;
-  std::string error;
-  CHECK(jpeg.toRgb(pic.view(), rgb, error));
-  CHECK(rgb.size() == 63u * 47u * 3u);
-  for (const auto & xy : {std::pair<int, int>{0, 0}, {62, 46}, {30, 20}}) {
-    const uint8_t * p = pixel(rgb, 63, xy.first, xy.second);
-    CHECK(p[0] >= 250);
-    CHECK(p[1] <= 5);
-    CHECK(p[2] <= 5);
-  }
-
-  // And through a JPEG it stays red.
   std::vector<uint8_t> data, decoded;
+  std::string error;
   int w = 0, h = 0;
   CHECK(jpeg.encode(pic.view(), 90, data, error));
   CHECK(jpeg.decode(data.data(), data.size(), w, h, decoded, error));
+  CHECK(w == 63 && h == 47);
   if (!decoded.empty()) {
-    const uint8_t * p = pixel(decoded, w, 30, 20);
-    CHECK(p[0] >= 240 && p[1] <= 15 && p[2] <= 15);
+    for (const auto & xy : {std::pair<int, int>{0, 0}, {62, 46}, {30, 20}}) {
+      const uint8_t * p = pixel(decoded, w, xy.first, xy.second);
+      CHECK(p[0] >= 240 && p[1] <= 15 && p[2] <= 15);
+    }
   }
 }
 
@@ -178,7 +170,6 @@ void testRejectsBadInput()
   CHECK(!jpeg.encode(pic.view(), 101, out, error));
   YuvImage empty;
   CHECK(!jpeg.encode(empty, 80, out, error));
-  CHECK(!jpeg.toRgb(empty, out, error));
   YuvImage short_stride = pic.view();
   short_stride.y_stride = 16;
   CHECK(!jpeg.encode(short_stride, 80, out, error));
@@ -195,7 +186,7 @@ int main()
   testChromaSize();
   testTiming();
   testEncodeGreyRamp();
-  testToRgbColour();
+  testEncodeColour();
   testRejectsBadInput();
   std::printf("%d checks, %d failed\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

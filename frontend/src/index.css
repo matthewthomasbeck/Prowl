@@ -1,17 +1,10 @@
 /* Colors are stored once here as variables, so the whole look can be changed in one place.
-   Green = the rover and the active selection. Amber = findings that still need review.
-   The panels are "smoked glass": dark, see-through, with a thin light edge. */
+   Green = the rover and what is active or live. Amber = warnings.
+   The panels are "smoked glass": a dark, see-through tint, with no blur. */
 :root {
   --bg: #0a0c0e; /* only seen if the photo fails to load */
   /* How dark the glass is: 0 = fully clear, 1 = solid. Change this one number to adjust every panel. */
-  --glass: 0.14;
-  /* How much the picture behind the glass is dimmed (1 = not at all, 0.5 = half as bright).
-     It lets the glass stay almost clear while keeping bright rocks from washing out the text. */
-  --glass-dim: 0.58;
-  /* How much the photo behind a section is blurred (0px = sharp, 12px = very frosted). */
-  --glass-blur: 2px;
-  /* The thin bright line around each panel. When the glass is almost clear, this is what shows where one section ends. */
-  --edge: rgba(255, 255, 255, 0.5);
+  --glass: 0.5;
   --panel: rgba(9, 12, 16, var(--glass)); /* the smoked-glass fill */
   --panel-raised: rgba(255, 255, 255, 0.07); /* rows and fields sitting on the glass */
   --border: rgba(255, 255, 255, 0.14);
@@ -26,8 +19,7 @@
   --amber-rgb: 243, 187, 85;
   --green-dim: rgba(var(--green-rgb), 0.16);
   --amber-dim: rgba(var(--amber-rgb), 0.16);
-  --solid: #0b0e11; /* fully solid dark, for the map and the pins */
-  --radius: 0;
+  --solid: #0b0e11; /* fully solid dark, behind pictures */
   --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
 
   color-scheme: dark; /* makes built-in controls like the status menu dark too */
@@ -38,9 +30,9 @@
    (they come from the Okabe-Ito palette, made for this). Other cues, like symbols and dashed outlines,
    are added in the places that use these colors. */
 :root[data-palette='colorblind'] {
-  --green: #56b4e9; /* sky blue: the robot and the active selection */
+  --green: #56b4e9; /* sky blue: the robot and what is active or live */
   --green-rgb: 86, 180, 233;
-  --amber: #e69f00; /* orange: findings that need review */
+  --amber: #e69f00; /* orange: warnings */
   --amber-rgb: 230, 159, 0;
 }
 
@@ -57,7 +49,7 @@ body {
   color: var(--text);
 }
 
-/* The page background: NASA's map of the whole Moon (credit is in src/assets/CREDITS.md), so the dark
+/* The page background: NASA's map of the whole Moon (credit is in docs/credits.md), so the dark
    seas and craters make it clearly the Moon. A dark layer on top keeps text easy to read.
    It sits behind everything. It is decoration only: not robot footage and not the mapped location. */
 body::before {
@@ -87,7 +79,7 @@ textarea {
   font: inherit;
 }
 
-/* Monospace is used only for sample IDs, coordinates and times. */
+/* Monospace is used only for numbers that change: times, distances and readings. */
 .mono {
   font-family: var(--mono);
 }
@@ -98,29 +90,14 @@ textarea {
   outline-offset: 2px;
 }
 
-/* ---- Connected straight to the robot (App.jsx sets data-link="robot") ----
-   The robot sends new readings several times a second, and the camera page plays video. Blurring the photo behind
-   every panel (backdrop-filter) makes the browser re-blur the page for each change, and the looping animations
-   make it re-draw all the time, which made the robot's dashboard lag badly while the robot's own test page didn't.
-   So here the glass is a plain, darker tint (the same look, without the blur) and nothing loops. */
-:root[data-link='robot'] {
-  --glass: 0.5;
-}
-
-:root[data-link='robot'] *,
-:root[data-link='robot'] *::before,
-:root[data-link='robot'] *::after {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  animation: none !important;
-}
-
-/* People who ask their device for less motion get no animations or sliding. */
+/* No blur behind the panels and nothing that loops: the robot sends new readings several times a second and the
+   Camera page plays video, and a blurred or animated page has to be re-drawn for each of them, which made the
+   dashboard lag far behind the robot.
+   People who ask their device for less motion also get no sliding or fading. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation: none !important;
     transition: none !important;
   }
 }
