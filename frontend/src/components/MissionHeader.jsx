@@ -11,8 +11,8 @@ function formatElapsed(totalSeconds) {
 
 // missionName and elapsedSeconds (the time since the robot started) are null until the robot answers.
 // connection: { text, live } for the label on the right; live fills in its dot.
-// pages: [{ id, label, icon }], the pages to switch between (map, camera, photos), shown as a row of tabs along the
-// bottom of the header; page is the open one, and onPage(id) opens another. On phones the tabs under the header
+// pages: [{ id, label, icon }], the pages to switch between (map, camera, photos, GPS), shown as a row of tabs along
+// the bottom of the header; page is the open one, and onPage(id) opens another. On phones the tabs under the header
 // (MobileTabs) do this instead.
 function MissionHeader({
   missionName,

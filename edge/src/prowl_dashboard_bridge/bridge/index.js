@@ -1,6 +1,6 @@
 // Prowl dashboard bridge: a ROS2 node (rclnodejs) that serves the dashboard over a WebSocket.
 //
-// ROS side: subscribes to /scan, /motor_status, /imu/data_raw and the camera's video and stills, publishes
+// ROS side: subscribes to /scan, /motor_status, /imu/data_raw, the GPS and the camera's video and stills, publishes
 // /cmd_vel, calls /camera/capture, and asks the motor driver whether it's in dry run. Every still is also
 // saved as a photo.
 // Dashboard side: ws://<pi>:<port>/ws/dashboard, speaking the messages in docs/protocol.md, and the camera
@@ -12,7 +12,7 @@
 import rclnodejs from 'rclnodejs'
 import { CameraFeed } from './camera.js'
 import { DriveGate } from './drive.js'
-import { ImuAverage, motorStatusMessage, motorsMode, scanMessage, stampSeconds } from './convert.js'
+import { ImuAverage, gpsMessage, motorStatusMessage, motorsMode, scanMessage, stampSeconds } from './convert.js'
 import { PhotoStore } from './photos.js'
 import { startServer } from './server.js'
 
@@ -25,7 +25,7 @@ const DRIVE_CHECK_MS = 50
 const CAPTURE_TIMEOUT_MS = 20000 // a full-resolution still normally takes about 1 s
 const MOTORS_CHECK_MS = 2000 // how often the motor driver is asked whether it's in dry run
 // The robot counts as connected while one of these sent something within stale_after seconds.
-const ROBOT_TOPICS = ['scan', 'motor_status', 'imu', 'camera']
+const ROBOT_TOPICS = ['scan', 'motor_status', 'imu', 'camera', 'gps']
 
 const PARAMS = {
   host: ['0.0.0.0', ParameterType.PARAMETER_STRING],
@@ -42,6 +42,7 @@ const PARAMS = {
   scan_rate: [5.0, ParameterType.PARAMETER_DOUBLE],
   motor_status_rate: [10.0, ParameterType.PARAMETER_DOUBLE],
   imu_rate: [5.0, ParameterType.PARAMETER_DOUBLE],
+  gps_rate: [2.0, ParameterType.PARAMETER_DOUBLE],
   stale_after: [2.0, ParameterType.PARAMETER_DOUBLE],
   photo_dir: ['data/photos', ParameterType.PARAMETER_STRING],
   max_photos: [200n, ParameterType.PARAMETER_INTEGER],
@@ -57,7 +58,7 @@ function readParams(node) {
 }
 
 function checkParams(p) {
-  const positive = ['linear_speed', 'angular_speed', 'drive_timeout', 'max_scan_points', 'scan_rate', 'motor_status_rate', 'imu_rate', 'stale_after', 'max_photos']
+  const positive = ['linear_speed', 'angular_speed', 'drive_timeout', 'max_scan_points', 'scan_rate', 'motor_status_rate', 'imu_rate', 'gps_rate', 'stale_after', 'max_photos']
   for (const name of positive) {
     if (!(p[name] > 0)) throw new Error(`parameter ${name} must be > 0, got ${p[name]}`)
   }
@@ -82,7 +83,10 @@ async function main() {
     motor_status: { msg: null, fresh: false, at: null },
     imu: { msg: null, fresh: false, at: null }, // msg: the newest average sent, readings pile up in `imu`
     camera: { msg: null, fresh: false, at: null }, // only `at`: the frames themselves live in `camera`
+    gps: { msg: null, fresh: false, at: null }, // msg: the newest /gps/fix
   }
+  // The GPS driver's velocity and receiver status, which go out with each fix
+  const gpsExtras = { velocity: null, velocityAt: null, status: null }
   const imu = new ImuAverage()
 
   function store(topic, msg) {
@@ -96,6 +100,17 @@ async function main() {
   node.createSubscription('sensor_msgs/msg/Imu', '/imu/data_raw', { qos: QoS.profileSensorData }, (msg) => {
     imu.add(msg)
     latest.imu.at = Date.now() / 1000
+  })
+
+  // The GPS driver sends a fix (and its status) once a second, with or without satellites, and its velocity
+  // only while it has a fix.
+  node.createSubscription('sensor_msgs/msg/NavSatFix', '/gps/fix', (msg) => store('gps', msg))
+  node.createSubscription('geometry_msgs/msg/TwistStamped', '/gps/vel', (msg) => {
+    gpsExtras.velocity = msg
+    gpsExtras.velocityAt = Date.now() / 1000
+  })
+  node.createSubscription('diagnostic_msgs/msg/DiagnosticStatus', '/gps/status', (msg) => {
+    gpsExtras.status = msg
   })
 
   const captureClient = node.createClient('std_srvs/srv/Trigger', '/camera/capture')
@@ -188,6 +203,11 @@ async function main() {
     wasConnected = connected
   }
 
+  function gpsNow() {
+    const velocityCurrent = gpsExtras.velocityAt !== null && Date.now() / 1000 - gpsExtras.velocityAt <= p.stale_after
+    return gpsMessage(latest.gps.msg, { velocity: velocityCurrent ? gpsExtras.velocity : null, status: gpsExtras.status })
+  }
+
   function scanNow() {
     return scanMessage(latest.scan.msg, { laser, maxPoints: p.max_scan_points })
   }
@@ -201,6 +221,7 @@ async function main() {
         scan: latest.scan.msg ? scanNow() : null,
         motor_status: latest.motor_status.msg ? motorStatusMessage(latest.motor_status.msg, WHEELS) : null,
         imu: latest.imu.msg,
+        gps: latest.gps.msg ? gpsNow() : null,
         camera_still: camera.still ? { ...camera.stillMessage(), photo: stillPhoto && photos.find(stillPhoto.t) } : null,
       },
       can_command: canDrive,
@@ -240,6 +261,7 @@ async function main() {
   const timers = [
     every(1 / p.scan_rate, 'scan', () => scanNow()),
     every(1 / p.motor_status_rate, 'motor_status', (msg) => motorStatusMessage(msg, WHEELS)),
+    every(1 / p.gps_rate, 'gps', () => gpsNow()),
     setInterval(() => {
       const message = imu.take()
       if (!message) return

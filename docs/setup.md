@@ -16,9 +16,9 @@ the repo does the container work for you. It works over SSH.
    It only listens on localhost; the container shares the Pi's network, so it can still reach it. The same
    package provides `/usr/include/pigpio.h`, which the container borrows because Ubuntu's pigpio headers
    leave it out.
-3. Turn on the LiDAR's serial port, the IMU's I2C bus and the camera in `/boot/firmware/config.txt`:
-   `enable_uart=1`, `dtparam=i2c_arm=on` and `camera_auto_detect=1`, then reboot. The wiring is in
-   [hardware.md](hardware.md).
+3. Turn on the LiDAR's serial port, the IMU's I2C bus, the camera and the GPS's serial port in
+   `/boot/firmware/config.txt`: `enable_uart=1`, `dtparam=i2c_arm=on`, `camera_auto_detect=1` and
+   `dtoverlay=uart4`, then reboot. The wiring is in [hardware.md](hardware.md).
 
 The first `./prowl` builds the Docker image, which takes a few minutes, and installs the npm packages for the
 bridge and the dashboard, which needs internet. After that it only rebuilds what changed.
@@ -32,7 +32,7 @@ bridge and the dashboard, which needs internet. After that it only rebuilds what
 ```
 
 `./prowl` starts the container, builds the robot's code and the dashboard, serves the dashboard on port 5173,
-and starts `robot.launch.py`: the LiDAR, IMU, camera and motor drivers and the dashboard bridge (port 8000).
+and starts `robot.launch.py`: the LiDAR, IMU, camera, GPS and motor drivers and the dashboard bridge (port 8000).
 The motor driver is in dry run unless you said live. Once the bridge answers, it prints where to open the
 dashboard:
 
@@ -93,4 +93,7 @@ shared Wi-Fi.
 | Strafing goes the wrong way | The mecanum wheels may be on the wrong corners: seen from above, the top rollers should form an X |
 | `camera_driver` says `no camera found` | `./prowl dev cam -l` should list `imx708_wide`. If it doesn't, but `rpicam-hello --list-cameras` on the Pi does, recreate the container with no robot running: `./prowl dev down && ./prowl dev up`. If neither does, check the ribbon cable at both ends |
 | `camera_driver` says the camera is in use | Another program has it: an `rpicam` app on the Pi, or a second `camera_node` |
+| `gps_driver` says `/dev/ttyAMA4: No such file or directory` | `dtoverlay=uart4` is missing from `/boot/firmware/config.txt` (reboot after adding it), or the container was created before it: `./prowl dev down && ./prowl dev up` with no robot running |
+| `gps_driver` says `no data` | Check the GPS's power and that its TX goes to GPIO9 (header pin 21) |
+| The GPS page says "No fix yet" | The GPS needs open sky; indoors it usually hears nothing. Outdoors, give it a minute or more after a cold start |
 | `./prowl lidar` or `./prowl imu` says the driver is reading the sensor | `./prowl` is running; stop it first |

@@ -1,5 +1,6 @@
-# The whole robot, as the dashboard uses it: the LD19 driver, the IMU driver, the camera driver, the motor
-# driver and the bridge. Nothing else publishes /cmd_vel. ./prowl runs this (and serves the dashboard).
+# The whole robot, as the dashboard uses it: the LD19 driver, the IMU driver, the camera driver, the GPS
+# driver, the motor driver and the bridge. Nothing else publishes /cmd_vel. ./prowl runs this (and serves
+# the dashboard).
 #
 #   ./prowl dev ros2 launch prowl_dashboard_bridge robot.launch.py             # motors in dry run (default)
 #   ./prowl dev ros2 launch prowl_dashboard_bridge robot.launch.py live:=true  # motors really move
@@ -45,6 +46,13 @@ def generate_launch_description():
             executable='camera_node',
             name='camera_driver',
             parameters=[config('prowl_camera_driver', 'camera_driver.yaml')],
+            output='screen',
+        ),
+        Node(
+            package='prowl_gps_driver',
+            executable='gps_node',
+            name='gps_driver',
+            parameters=[config('prowl_gps_driver', 'gps_driver.yaml')],
             output='screen',
         ),
         Node(

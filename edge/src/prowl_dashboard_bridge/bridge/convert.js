@@ -96,3 +96,49 @@ export class ImuAverage {
     return message
   }
 }
+
+// The GPS driver's /gps/fix (sensor_msgs/NavSatFix), with its newest /gps/vel (geometry_msgs/TwistStamped,
+// east-north-up) and /gps/status (diagnostic_msgs/DiagnosticStatus) -> {type: 'gps', ...}: see
+// docs/protocol.md. Pass velocity only while it's current: the driver stops sending it when the fix goes.
+const NAVSAT_NO_FIX = -1 // sensor_msgs/NavSatStatus
+export function gpsMessage(fix, { velocity = null, status = null } = {}) {
+  const values = Object.fromEntries((status?.values ?? []).map(({ key, value }) => [key, value]))
+  const number = (key) => {
+    const value = values[key] === undefined || values[key] === '' ? NaN : Number(values[key])
+    return Number.isFinite(value) ? value : null
+  }
+  const hasFix = fix.status.status !== NAVSAT_NO_FIX && Number.isFinite(fix.latitude) && Number.isFinite(fix.longitude)
+  const fixType = values.fix === '2d' || values.fix === '3d' ? values.fix : '3d'
+
+  let speed = null
+  let course = null
+  if (hasFix && velocity) {
+    const { x: east, y: north } = velocity.twist.linear
+    speed = round(Math.hypot(east, north), 2)
+    course = round(((Math.atan2(east, north) * 180) / Math.PI + 360) % 360, 1)
+  }
+
+  let satellites = []
+  try {
+    satellites = JSON.parse(values.satellites ?? '[]').map(([id, elevation, azimuth, cno, used]) => ({ id, elevation, azimuth, cno, used }))
+  } catch {
+    // an unreadable list: show none
+  }
+
+  return {
+    type: 'gps',
+    t: round(stampSeconds(fix.header), 3),
+    fix: hasFix ? fixType : 'none',
+    lat: hasFix ? round(fix.latitude, 7) : null,
+    lon: hasFix ? round(fix.longitude, 7) : null,
+    alt: hasFix ? number('altitude_msl') : null,
+    speed,
+    course,
+    satellites_used: number('satellites_used') ?? 0,
+    hdop: number('hdop'),
+    vdop: number('vdop'),
+    pdop: number('pdop'),
+    utc: number('utc'),
+    satellites,
+  }
+}

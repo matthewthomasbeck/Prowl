@@ -24,13 +24,13 @@ prints the dashboard's address. Anything else on the port is a `404`.
 ```json
 {"type": "snapshot",
  "session": {"name": "Prowl live", "started_at": 1792879880.0, "robot_connected": true},
- "latest": {"status": {}, "scan": {}, "motor_status": {}, "imu": {}, "camera_still": {}},
+ "latest": {"status": {}, "scan": {}, "motor_status": {}, "imu": {}, "gps": {}, "camera_still": {}},
  "can_command": true}
 ```
 `latest` holds the newest message of each type below, or `null` before the first one. `session.name` is
 the `mission_name` parameter and `session.started_at` is when the bridge started (the dashboard's clock
 counts from it). `can_command` says whether this connection may drive. `session.robot_connected` is true
-while the LiDAR, motor driver, IMU or camera sent something in the last `stale_after` (2) seconds; the
+while the LiDAR, motor driver, IMU, camera or GPS sent something in the last `stale_after` (2) seconds; the
 bridge itself being up doesn't count.
 
 Then, at the rates set in `edge/src/prowl_dashboard_bridge/config/dashboard_bridge.yaml` (only when something
@@ -41,7 +41,8 @@ new came in):
 | `scan` | `/scan` | 5 Hz | `{"t", "points": [[x, y], ...]}` around the robot, at most `max_scan_points` (180) |
 | `motor_status` | `/motor_status` | 10 Hz | `{"wheels": ["front_left", "rear_left", "front_right", "rear_right"], "duties": [0.5, 0.5, 0.5, 0.5]}` |
 | `imu` | `/imu/data_raw` | 5 Hz | `{"t", "gyro": [x, y, z], "accel": [x, y, z]}` |
-| `status` | the bridge | 1 Hz | `{"motors": "live", "topic_age_s": {"scan": 0.1, "motor_status": 0, "imu": 0.1, "camera": 0}}` |
+| `gps` | `/gps/fix`, `/gps/vel`, `/gps/status` | 2 Hz (the GPS sends once a second) | `{"t", "fix": "3d", "lat": 47.2852331, "lon": 8.5652654, "alt": 499.6, "speed": 1.0, "course": 36.9, "satellites_used": 8, "hdop": 1.01, "vdop": 1.54, "pdop": 1.94, "utc": 1792946400.0, "satellites": [{"id": 7, "elevation": 29, "azimuth": 116, "cno": 41, "used": true}, ...]}` |
+| `status` | the bridge | 1 Hz | `{"motors": "live", "topic_age_s": {"scan": 0.1, "motor_status": 0, "imu": 0.1, "camera": 0, "gps": 0.4}}` |
 | `camera_still` | `/camera/still/compressed` | each time a photo is taken | `{"t", "url": "/api/camera/still.jpg?t=1792898607.41", "photo": {saved photo}}` |
 | `photo_deleted` | the bridge | when a dashboard deletes a photo | `{"name": "prowl-20261024-221120-413"}` |
 | `robot_connected`, `robot_disconnected` | the bridge | when `session.robot_connected` changes | `{}` |
@@ -56,12 +57,20 @@ new came in):
   shows. `gyro` is turn rate in rad/s and `accel` is acceleration in m/s² with gravity in, each [x, y, z] in
   `imu_link` (x forward, y left, z up). The accelerometer isn't calibrated yet and reads gravity about 7 %
   low, so use it for tilt angles, not magnitudes. Nothing arrives for the first 2 s while the gyro calibrates.
+- **gps**: where the robot is on Earth. `fix` is `"none"`, `"2d"` or `"3d"`; without a fix, `lat`, `lon`,
+  `alt`, `speed` and `course` are `null`, and the rest still says what the receiver hears. `lat` and `lon` are
+  degrees (WGS84, north and east positive), `alt` is metres above mean sea level, `speed` is m/s over ground
+  and `course` degrees clockwise from true north (only meaningful while moving). `hdop`, `vdop` and `pdop` are
+  the dilutions of precision (99.99 without a fix): roughly, the position is good to `hdop` × 2.5 m. `utc` is
+  the receiver's own time (s since 1970), `null` until it knows the date. `satellites` lists every satellite in
+  view: elevation and azimuth in degrees (`null` if not known yet), `cno` the signal strength in dBHz (`null`
+  when not heard), and `used` whether it's in the fix.
 - **status**: `topic_age_s` is how many seconds ago each topic last arrived (`null` = never), so the
-  dashboard can tell a stalled sensor from a quiet one. `camera` is the video. `motors` says whether driving
-  can move the robot: `"live"`, `"dry_run"` (the motor driver works out duties, so `motor_status` changes,
-  but leaves the pins alone), or `null` when the motor driver isn't answering. The bridge asks the motor
-  driver for its `dry_run` parameter every 2 s. `robot.launch.py` starts it in dry run unless `live:=true`
-  (`./prowl --live`).
+  dashboard can tell a stalled sensor from a quiet one. `camera` is the video and `gps` is `/gps/fix`.
+  `motors` says whether driving can move the robot: `"live"`, `"dry_run"` (the motor driver works out duties,
+  so `motor_status` changes, but leaves the pins alone), or `null` when the motor driver isn't answering. The
+  bridge asks the motor driver for its `dry_run` parameter every 2 s. `robot.launch.py` starts it in dry run
+  unless `live:=true` (`./prowl --live`).
 - **camera_still**: a new full-resolution photo, whoever asked for it. Show it from `url`; the `t` in it
   makes every photo a new address, so a browser never shows a cached one. The snapshot has the newest one.
   `photo` is its saved copy, as listed by `GET /api/camera/photos`, or `null` if it wasn't saved (it was
@@ -127,6 +136,9 @@ Photos can show people near the robot, so the dashboard's Photos page has a Dele
 | `/scan` | `sensor_msgs/LaserScan` (subscribed best effort) | in |
 | `/motor_status` | `std_msgs/Float64MultiArray` | in |
 | `/imu/data_raw` | `sensor_msgs/Imu` (subscribed best effort) | in |
+| `/gps/fix` | `sensor_msgs/NavSatFix` | in |
+| `/gps/vel` | `geometry_msgs/TwistStamped` | in; used while it's newer than `stale_after` |
+| `/gps/status` | `diagnostic_msgs/DiagnosticStatus` | in |
 | `/motor_driver/get_parameters` | `rcl_interfaces/GetParameters` | service called every 2 s for `dry_run` (`status.motors`) |
 | `/cmd_vel` | `geometry_msgs/Twist` | out, only while a dashboard drives, plus the stops above |
 | `/camera/image_raw/compressed` | `sensor_msgs/CompressedImage` (JPEG, subscribed best effort) | in |

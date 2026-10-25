@@ -156,6 +156,7 @@ const SENSORS = [
   { topic: 'scan', name: 'LiDAR' },
   { topic: 'motor_status', name: 'Motors' },
   { topic: 'imu', name: 'IMU' },
+  { topic: 'gps', name: 'GPS' },
 ]
 
 function sensorState(age) {

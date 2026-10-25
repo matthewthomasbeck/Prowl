@@ -6,6 +6,7 @@ import MissionMap from './components/MissionMap.jsx'
 import CameraPanel from './components/CameraPanel.jsx'
 import CameraPage from './components/CameraPage.jsx'
 import PhotosPage from './components/PhotosPage.jsx'
+import GpsPage from './components/GpsPage.jsx'
 import DriveBar from './components/DriveBar.jsx'
 import MoonGlobeWindow from './components/MoonGlobeWindow.jsx'
 import { backgroundPhoto } from './data/backgroundPhoto.js'
@@ -24,16 +25,17 @@ function readToken() {
   }
 }
 
-// The Camera and Photos pages have their own addresses (#camera, #photos), so the browser's Back button and links
-// work. Everything else is the map page.
+// The Camera, Photos and GPS pages have their own addresses (#camera, #photos, #gps), so the browser's Back button
+// and links work. Everything else is the map page.
 const PAGES = [
   { id: 'map', label: 'Map', icon: 'map' },
   { id: 'camera', label: 'Camera', icon: 'camera' },
   { id: 'photos', label: 'Photos', icon: 'scan' },
+  { id: 'gps', label: 'GPS', icon: 'globe' },
 ]
 const pageFromAddress = () => {
   const name = window.location.hash.slice(1)
-  return name === 'camera' || name === 'photos' ? name : 'map'
+  return PAGES.some((entry) => entry.id === name) ? name : 'map'
 }
 
 // The connection label in the header: what it says, and whether its dot shows "live".
@@ -127,7 +129,9 @@ function App() {
       <MoonGlobeWindow open={globeOpen} onClose={() => setGlobeOpen(false)} />
       <MobileTabs pages={PAGES} page={page} onPage={openPage} />
 
-      {page === 'photos' ? (
+      {page === 'gps' ? (
+        <GpsPage available={connected} link={link} gpsAge={topicAges?.gps ?? null} onBack={() => openPage('map')} />
+      ) : page === 'photos' ? (
         <PhotosPage
           available={connected}
           changed={link.photosChanged}

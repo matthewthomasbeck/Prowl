@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react'
-import MoonGlobe from './MoonGlobe.jsx'
+import Globe from './Globe.jsx'
+import moonMapUrl from '../assets/moon-map-2k.jpg'
 import SectionIcon from './SectionIcon.jsx'
 import { moonMap } from '../data/backgroundPhoto.js'
 import './MoonGlobeWindow.css'
@@ -42,7 +43,7 @@ function MoonGlobeWindow({ open, onClose }) {
             </button>
           </div>
 
-          <MoonGlobe />
+          <Globe mapUrl={moonMapUrl} name="the Moon" />
 
           <p className="globe-note">
             Decorative reference only. This globe does not show where the robot is, and the fictional mission area

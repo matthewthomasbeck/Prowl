@@ -1,0 +1,7 @@
+gps_driver:
+  ros__parameters:
+    port: /dev/ttyAMA4      # UART4 (dtoverlay=uart4): the GPS's TX goes to GPIO9 (header pin 21), its RX to GPIO8 (pin 24)
+    baud: 9600              # the u-blox 7's default
+    frame_id: gps_link
+    uere: 2.5               # m: the error per unit of DOP, for the fix's covariance (u-blox 7 spec: 2.5 m CEP)
+    stats_period: 10.0      # s between rate/fix log lines, 0 = off

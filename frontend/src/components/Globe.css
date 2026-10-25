@@ -1,4 +1,4 @@
-.moon-globe {
+.globe {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -6,8 +6,8 @@
   gap: 10px;
 }
 
-/* The picture area: a solid dark screen, like the exploration map's frame */
-.moon-canvas {
+/* The picture area: a solid dark screen, like the exploration map's frame. The page using it can make it bigger. */
+.globe-canvas {
   width: 100%;
   max-width: 520px;
   aspect-ratio: 1;
@@ -17,33 +17,35 @@
   touch-action: none; /* lets a finger drag the globe instead of scrolling the page */
 }
 
-.moon-canvas:active {
+.globe-canvas:active {
   cursor: grabbing;
 }
 
-.moon-loading {
+.globe-loading {
   position: absolute;
   top: 45%;
   color: var(--muted);
 }
 
-.moon-controls {
+.globe-controls {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 8px;
 }
 
-.moon-controls .button {
+.globe-controls .button {
   min-width: 44px;
 }
 
-.moon-zoom {
+.globe-zoom {
   min-width: 54px;
   text-align: center;
   font-size: 14px;
 }
 
-.moon-hint {
+.globe-hint {
   font-size: 12px;
   text-align: center;
   color: var(--muted);

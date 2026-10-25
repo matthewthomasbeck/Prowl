@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ImuAverage, motorStatusMessage, motorsMode, scanMessage } from '../bridge/convert.js'
+import { ImuAverage, gpsMessage, motorStatusMessage, motorsMode, scanMessage } from '../bridge/convert.js'
 
 const header = { stamp: { sec: 100, nanosec: 500000000 }, frame_id: 'laser_link' }
 const close = (actual, expected, tolerance = 1e-3) =>
@@ -90,4 +90,71 @@ test('motors mode from the motor driver dry_run parameter', () => {
   // a driver without the parameter answers with PARAMETER_NOT_SET (0)
   assert.equal(motorsMode({ values: [{ type: 0, bool_value: false }] }), null)
   assert.equal(motorsMode({ values: [] }), null)
+})
+
+function navSatFix(status, latitude, longitude) {
+  return { header: { stamp: { sec: 200, nanosec: 250000000 }, frame_id: 'gps_link' }, status: { status, service: 1 }, latitude, longitude, altitude: 547.6 }
+}
+function gpsStatus(values) {
+  return { level: 0, name: 'gps_driver: receiver', message: '', hardware_id: '', values: Object.entries(values).map(([key, value]) => ({ key, value })) }
+}
+const threeDStatus = gpsStatus({
+  fix: '3d',
+  quality: '1',
+  utc: '1039426045.00',
+  altitude_msl: '499.6',
+  satellites_used: '2',
+  satellites_in_view: '2',
+  hdop: '1.20',
+  vdop: '2.00',
+  pdop: '2.30',
+  satellites: '[[7,29,116,41,true],[10,7,189,null,false]]',
+})
+
+test('gps with a fix: position, altitude above sea level, speed and course, satellites', () => {
+  const velocity = { twist: { linear: { x: 1, y: -1, z: 0 } } } // east and south: course 135 degrees
+  const m = gpsMessage(navSatFix(0, 47.2852331234, 8.5652654321), { velocity, status: threeDStatus })
+  assert.equal(m.type, 'gps')
+  assert.equal(m.t, 200.25)
+  assert.equal(m.fix, '3d')
+  assert.equal(m.lat, 47.2852331)
+  assert.equal(m.lon, 8.5652654)
+  assert.equal(m.alt, 499.6)
+  close(m.speed, Math.SQRT2, 0.01)
+  assert.equal(m.course, 135)
+  assert.equal(m.satellites_used, 2)
+  assert.deepEqual([m.hdop, m.vdop, m.pdop], [1.2, 2, 2.3])
+  assert.equal(m.utc, 1039426045)
+  assert.deepEqual(m.satellites, [
+    { id: 7, elevation: 29, azimuth: 116, cno: 41, used: true },
+    { id: 10, elevation: 7, azimuth: 189, cno: null, used: false },
+  ])
+})
+
+test('gps course is 0-360, clockwise from north', () => {
+  const west = gpsMessage(navSatFix(0, 1, 2), { velocity: { twist: { linear: { x: -2, y: 0, z: 0 } } }, status: threeDStatus })
+  assert.equal(west.course, 270)
+  assert.equal(west.speed, 2)
+})
+
+test('gps without a fix: no position, speed or course; the receiver status still shows', () => {
+  const status = gpsStatus({ fix: 'none', quality: '0', utc: '', altitude_msl: '', satellites_used: '0', satellites_in_view: '0', hdop: '99.99', vdop: '99.99', pdop: '99.99', satellites: '[]' })
+  const velocity = { twist: { linear: { x: 1, y: 1, z: 0 } } }
+  const m = gpsMessage(navSatFix(-1, NaN, NaN), { velocity, status })
+  assert.equal(m.fix, 'none')
+  assert.deepEqual([m.lat, m.lon, m.alt, m.speed, m.course, m.utc], [null, null, null, null, null, null])
+  assert.equal(m.hdop, 99.99)
+  assert.deepEqual(m.satellites, [])
+  // The result has to survive JSON: no NaN anywhere.
+  assert.deepEqual(JSON.parse(JSON.stringify(m)), m)
+})
+
+test('gps without a status yet, or with an unreadable satellite list', () => {
+  const m = gpsMessage(navSatFix(0, 10, 20))
+  assert.equal(m.fix, '3d')
+  assert.deepEqual([m.lat, m.lon], [10, 20])
+  assert.deepEqual([m.alt, m.hdop, m.satellites_used, m.speed], [null, null, 0, null])
+  assert.deepEqual(m.satellites, [])
+  assert.deepEqual(gpsMessage(navSatFix(0, 10, 20), { status: gpsStatus({ fix: '2d', satellites: '[[' }) }).satellites, [])
+  assert.equal(gpsMessage(navSatFix(0, 10, 20), { status: gpsStatus({ fix: '2d' }) }).fix, '2d')
 })

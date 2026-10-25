@@ -1,0 +1,273 @@
+/* The GPS page: the Earth globe big on the left, the fix and the satellites on the right, in the dashboard's
+   borderless style. On a desktop the page fits the window (like the map page), and the globe shrinks to fit. */
+.gps-page {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.gps-view {
+  min-height: 0;
+}
+
+.gps-view .panel-heading h2 {
+  margin-right: auto;
+}
+
+.gps-back {
+  min-height: 32px;
+  padding: 4px 12px;
+}
+
+.gps-empty {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.gps-tag-live {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.gps-globe {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: safe center;
+  min-height: 0;
+}
+
+.gps-globe .globe-canvas {
+  max-width: 560px;
+}
+
+/* Says why there's no marker, over the top of the globe */
+.gps-note {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: min(92%, 460px);
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  background: rgba(5, 8, 12, 0.85);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--text);
+  transform: translateX(-50%);
+}
+
+.gps-credit {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.gps-credit a {
+  color: var(--text);
+}
+
+.gps-side {
+  min-height: 0;
+}
+
+/* The side panel scrolls inside this, not the panel itself: the panel's soft backdrop reaches past its edges, and
+   would give the panel scrollbars of its own */
+.gps-side-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding-right: 4px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+/* Scroll rather than squash: without this the sky plot shrinks to nothing when the list is long */
+.gps-side-scroll > * {
+  flex-shrink: 0;
+}
+
+.gps-side .panel-heading {
+  margin-bottom: 2px;
+}
+
+.gps-sats-heading {
+  margin-top: 10px;
+}
+
+/* Label above value, two to a row */
+.gps-readouts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.gps-readout dd {
+  margin: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The sky plot: rings at the horizon, 30° and 60° up, laid out like a map: north up, east right */
+.sky-plot {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  margin: 0 auto;
+}
+
+.sky-ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1;
+}
+
+.sky-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.sky-sat {
+  stroke-width: 1.5;
+}
+
+.sky-sat-used {
+  fill: var(--green);
+  stroke: var(--green);
+}
+
+.sky-sat-tracked {
+  fill: rgba(5, 8, 12, 0.9);
+  stroke: var(--text);
+}
+
+/* Dashed as well as dim, so it doesn't rely on color */
+.sky-sat-idle {
+  fill: rgba(5, 8, 12, 0.9);
+  stroke: var(--muted);
+  stroke-dasharray: 3 2;
+}
+
+.sky-id {
+  font-family: var(--mono);
+  font-size: 8px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  fill: var(--text);
+}
+
+.sky-id-used {
+  fill: #0a0c0e;
+  font-weight: 700;
+}
+
+.sky-id-idle {
+  fill: var(--muted);
+}
+
+.gps-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.gps-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border: 1.5px solid var(--text);
+  border-radius: 50%;
+}
+
+.gps-key:first-child {
+  margin-left: 0;
+}
+
+.gps-key-used {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.gps-key-idle {
+  border-color: var(--muted);
+  border-style: dashed;
+}
+
+.gps-signals {
+  display: grid;
+  gap: 3px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.gps-signal {
+  display: grid;
+  grid-template-columns: 2.5em minmax(0, 1fr) 7.5em;
+  align-items: center;
+  gap: 8px;
+}
+
+.gps-signal-id {
+  text-align: right;
+  color: var(--muted);
+}
+
+.gps-signal-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.gps-signal-fill {
+  display: block;
+  height: 100%;
+  background: var(--text);
+  opacity: 0.6;
+}
+
+.gps-signal-fill.used {
+  background: var(--green);
+  opacity: 1;
+}
+
+.gps-signal-value {
+  color: var(--muted);
+}
+
+@media (min-width: 900px) {
+  .gps-page {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+  }
+}
+
+/* Desktop with a tall enough window: the page fills it, and the globe is as big as the space left for it, minus
+   its zoom buttons and hint (the globe's box is a size container, so 100cqh is its height) */
+@media (min-width: 1100px) and (min-height: 620px) {
+  .gps-page {
+    align-items: stretch;
+  }
+
+  .gps-globe {
+    container-type: size;
+  }
+
+  .gps-globe .globe-canvas {
+    max-width: max(200px, min(640px, calc(100cqh - 84px)));
+  }
+}

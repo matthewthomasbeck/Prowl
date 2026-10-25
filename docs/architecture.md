@@ -9,10 +9,12 @@ flowchart LR
   lidar["LD19 LiDAR"] -->|UART| ld19["ld19_driver"]
   mpu["MPU6050"] -->|I2C| imu["mpu6050_driver"]
   cam["Camera Module 3"] -->|CSI| camera["camera_driver"]
+  gpsmod["u-blox 7 GPS"] -->|UART| gps["gps_driver"]
   ld19 -->|/scan| bridge["dashboard_bridge (port 8000)"]
   imu -->|/imu/data_raw| bridge
   camera -->|"/camera/image_raw/compressed, /camera/still/compressed"| bridge
   bridge -->|/camera/capture| camera
+  gps -->|"/gps/fix, /gps/vel, /gps/status"| bridge
   motor["motor_driver"] -->|/motor_status| bridge
   bridge -->|/cmd_vel| motor
   panel["motor_panel (./prowl panel)"] -->|/wheel_cmd| motor
@@ -25,7 +27,7 @@ flowchart LR
 
 - **On the Pi itself:** Docker, and the pigpio daemon (`pigpiod`), which the motor driver uses for
   hardware-timed PWM.
-- **In the `prowl-edge-dev` container** (ROS2 Jazzy, sharing the Pi's network): the five nodes, started by
+- **In the `prowl-edge-dev` container** (ROS2 Jazzy, sharing the Pi's network): the six nodes, started by
   `edge/src/prowl_dashboard_bridge/launch/robot.launch.py`. The workspace (`edge/`) is mounted at `/ws`.
 - **In the `prowl-dashboard-web` container** (the same image, for its Node.js): `vite preview`, which serves
   the built dashboard on port 5173 and forwards `/ws` and `/api` to the bridge, so the browser only ever uses
@@ -40,6 +42,9 @@ flowchart LR
 | `/camera/image_raw/compressed` | `sensor_msgs/CompressedImage` (JPEG) | camera_driver | dashboard bridge |
 | `/camera/still/compressed` | `sensor_msgs/CompressedImage` (JPEG) | camera_driver, for each `/camera/capture` | dashboard bridge |
 | `/camera/capture` | `std_srvs/Trigger` (service) | camera_driver | dashboard bridge |
+| `/gps/fix` | `sensor_msgs/NavSatFix` | gps_driver, once a second | dashboard bridge |
+| `/gps/vel` | `geometry_msgs/TwistStamped` | gps_driver, while it has a fix | dashboard bridge |
+| `/gps/status` | `diagnostic_msgs/DiagnosticStatus` | gps_driver, once a second | dashboard bridge |
 | `/cmd_vel` | `geometry_msgs/Twist` | dashboard bridge, while someone drives | motor_driver |
 | `/wheel_cmd` | `std_msgs/Float64MultiArray` | motor panel | motor_driver |
 | `/motor_status` | `std_msgs/Float64MultiArray` | motor_driver | dashboard bridge, motor panel |
@@ -50,10 +55,12 @@ The details of each are in [drivers.md](drivers.md), and what the bridge sends t
 ## Conventions
 
 - ROS conventions (REP 103): x forward, y left, z up, angles counter-clockwise, metres and radians.
-- Frames: `base_link` is the robot, with `laser_link`, `imu_link` and `camera_link` on it. No TF is
+- Frames: `base_link` is the robot, with `laser_link`, `imu_link`, `camera_link` and `gps_link` on it. No TF is
   published; the bridge places the LiDAR on the robot with its `laser_x`, `laser_y` and `laser_yaw` parameters.
-- The robot doesn't track its position (there are no wheel encoders and no SLAM), so the dashboard shows the
-  LiDAR around the robot rather than a map, and draws the robot in the middle of a decorative survey zone.
+- The robot doesn't track its position on the ground (there are no wheel encoders and no SLAM), so the
+  dashboard shows the LiDAR around the robot rather than a map, and draws the robot in the middle of a
+  decorative survey zone. The GPS gives its position on Earth, to a few metres, which the GPS page shows on a
+  globe.
 
 ## The repo
 
@@ -66,6 +73,7 @@ edge/                 the robot's code: a ROS2 workspace
     prowl_ld19_driver/        the LiDAR driver node, and a terminal viewer
     prowl_mpu6050_driver/     the IMU driver node, and a terminal monitor
     prowl_camera_driver/      the camera driver node
+    prowl_gps_driver/         the GPS driver node
     prowl_dashboard_bridge/   the dashboard bridge (Node.js), and robot.launch.py
   data/photos/        photos the robot keeps (not in git)
 frontend/             the dashboard: a React app built with Vite (docs/dashboard.md)

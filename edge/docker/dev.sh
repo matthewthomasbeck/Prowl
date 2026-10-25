@@ -43,10 +43,10 @@ case "${1:-}" in
     elif exists; then
       "${DOCKER[@]}" start "$CONTAINER" >/dev/null
     else
-      # Sensors, when present: the LD19 LiDAR on the mini UART (GPIO15) and the MPU6050 on I2C bus 1.
-      # Their device nodes belong to the host's dialout and i2c groups.
+      # Sensors, when present: the LD19 LiDAR on the mini UART (GPIO15), the GPS on UART4 (GPIO8/9) and
+      # the MPU6050 on I2C bus 1. Their device nodes belong to the host's dialout and i2c groups.
       sensors=()
-      for dev in /dev/ttyS0 /dev/i2c-1; do
+      for dev in /dev/ttyS0 /dev/ttyAMA4 /dev/i2c-1; do
         [ -e "$dev" ] && sensors+=(--device "$dev")
       done
       i2c_gid="$(getent group i2c | cut -d: -f3)"

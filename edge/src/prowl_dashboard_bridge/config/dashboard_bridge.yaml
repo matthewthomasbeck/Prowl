@@ -23,8 +23,9 @@ dashboard_bridge:
     scan_rate: 5.0          # Hz
     motor_status_rate: 10.0 # Hz
     imu_rate: 5.0           # Hz: each imu message is the average of the readings since the last one
+    gps_rate: 2.0           # Hz: the GPS driver sends a fix once a second
 
-    stale_after: 2.0        # s: the robot counts as connected while the LiDAR, motors, IMU or camera sent something this recently
+    stale_after: 2.0        # s: the robot counts as connected while the LiDAR, motors, IMU, camera or GPS sent something this recently
 
     # Every photo the camera takes is kept here, for the dashboard's photos page. A relative path starts where
     # the bridge was started (edge/ in the dev container). Past max_photos (about 1 MB each), the oldest goes.

@@ -1,5 +1,5 @@
-// Facts about the NASA Moon map, kept here so the on-screen credits and the README agree.
-// It is DECORATION. It is not robot footage, and it does not show the (fictional) mapped location.
+// Facts about the NASA images, kept here so the on-screen credits and docs/credits.md agree.
+// The Moon pictures are DECORATION: not robot footage, and they do not show the (fictional) mapped location.
 
 // The page background. It is the same map the interactive Moon globe uses.
 export const backgroundPhoto = {
@@ -24,4 +24,13 @@ export const moonMap = {
   sourceName: 'CGI Moon Kit (LROC color map)',
   sourceUrl: 'https://svs.gsfc.nasa.gov/4720',
   note: 'Optimized for looks, not for science.',
+}
+
+// The map that is wrapped around the GPS page's Earth globe. Unlike the Moon pictures, the robot's position marked on
+// it is real: it comes from the robot's GPS.
+export const earthMap = {
+  credit: 'NASA Earth Observatory',
+  sourceName: 'Blue Marble: Next Generation, December, with topography and bathymetry',
+  sourceUrl: 'https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/',
+  note: 'A cloud-free composite from 2004, so it shows no weather and nothing built since.',
 }

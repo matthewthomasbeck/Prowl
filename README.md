@@ -34,6 +34,9 @@ The `LD19` LIDAR unit is connected to the RX port of the raspberry pi over UART.
 - **IMU - MPU6050**
 The `MPU6050` unit is connected to the pi over a data line and clock line, located at pins 3 and 5. it sends data using the `/imu/data_raw` topic, which is then read on the dashboard.
 
+- **GPS - u-blox 7**
+The GPS module is connected to the pi's second UART (UART4) at pins 21 (RX) and 24 (TX). Its driver reads the NMEA sentences the GPS sends once a second and publishes the robot's position on the `/gps/fix` topic, along with the satellites it can hear on `/gps/status`. The dashboard's GPS page shows where the robot is on a globe of the Earth!
+
 - **DCMC x 2 - DC5-12V 0A-30A**
 The DCMCs are used for motor control, they use the `/cmd_vel` and  `/wheel_cmd` topics to communicate with the dashboard, `cmd_vel` stands for "command velocity" and tells all four motors to move forward together. `wheel_cmd` stands for "wheel command" and tells a specific motor to move at a certain velocity.
 

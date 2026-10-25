@@ -1,6 +1,6 @@
 # Prowl docs
 
-Prowl is a small mecanum-wheeled robot with a LiDAR, an IMU and a camera, driven from a browser dashboard
+Prowl is a small mecanum-wheeled robot with a LiDAR, an IMU, a camera and a GPS, driven from a browser dashboard
 styled like a Moon-mission screen. Everything runs on the robot's Raspberry Pi: `./prowl`, at the root of the
 repo, starts the robot and serves the dashboard.
 

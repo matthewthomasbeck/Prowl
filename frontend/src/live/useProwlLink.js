@@ -7,9 +7,9 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 //
 // The robot sends one "snapshot" with the whole current state, then one message per update.
 //
-// The robot's fastest readings (LiDAR scans 5 times a second, wheel duties 10, IMU 5) don't re-draw the page
-// at all: they're kept in link.live, and only the parts that show them read them, with
-// useLiveValue(link, 'scan' | 'motorStatus' | 'imu'). Re-drawing the whole dashboard for each of them is
+// The robot's frequent readings (LiDAR scans 5 times a second, wheel duties 10, IMU 5, GPS 1) don't re-draw the
+// page at all: they're kept in link.live, and only the parts that show them read them, with
+// useLiveValue(link, 'scan' | 'motorStatus' | 'imu' | 'gps'). Re-drawing the whole dashboard for each of them is
 // what made it lag behind the robot.
 
 const empty = {
@@ -27,6 +27,8 @@ const emptyLive = {
   scan: null, // { t, points: [[x, y], ...] } in metres around the robot (x forward, y left): the newest LiDAR scan
   motorStatus: null, // { wheels: [4 names], duties: [-1..1 x4] }, what the motor driver applies now
   imu: null, // { t, gyro: [x, y, z] rad/s, accel: [x, y, z] m/s² }, averaged over a fraction of a second
+  gps: null, // { t, fix: 'none' | '2d' | '3d', lat, lon, alt, speed, course, satellites_used, hdop, vdop, pdop, utc,
+  //           satellites: [{ id, elevation, azimuth, cno, used }] }: the newest GPS fix (see docs/protocol.md)
 }
 
 // A tiny store for the fast readings: the parts of the page that show one subscribe to it.
@@ -46,7 +48,7 @@ function createLiveStore() {
   }
 }
 
-// The newest scan, motorStatus or imu. Re-draws only the component that calls it, whenever a new one arrives.
+// The newest scan, motorStatus, imu or gps. Re-draws only the component that calls it, whenever a new one arrives.
 export function useLiveValue(link, key) {
   return useSyncExternalStore(link.live.subscribe, () => link.live.get(key))
 }
@@ -93,7 +95,12 @@ export function useProwlLink(token = '') {
             cameraStill: latest.camera_still || null,
             photosChanged: current.photosChanged + 1,
           }))
-          live.set({ scan: latest.scan || null, motorStatus: latest.motor_status || null, imu: latest.imu || null })
+          live.set({
+            scan: latest.scan || null,
+            motorStatus: latest.motor_status || null,
+            imu: latest.imu || null,
+            gps: latest.gps || null,
+          })
           break
         }
         case 'status':
@@ -107,6 +114,9 @@ export function useProwlLink(token = '') {
           break
         case 'imu':
           live.set({ imu: m })
+          break
+        case 'gps':
+          live.set({ gps: m })
           break
         case 'camera_still':
           update((current) => ({ cameraStill: m, photosChanged: current.photosChanged + 1 }))

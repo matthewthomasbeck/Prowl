@@ -10,8 +10,8 @@ it on the Pi ([setup.md](setup.md)).
 **The header:** "Prowl | Material Reconnaissance", the mission (the bridge's `mission_name`), the time since
 the robot started, the **Moon globe** and **Color-blind mode** buttons, and the connection: "Robot connected —
 live", "Robot offline — showing last data" (the robot or its sensors went quiet), "Connecting to the robot…"
-or "Robot not connected". Under it, tabs switch between three pages. The Camera and Photos pages have their
-own addresses (`#camera`, `#photos`), so the browser's Back button works.
+or "Robot not connected". Under it, tabs switch between four pages. The Camera, Photos and GPS pages have
+their own addresses (`#camera`, `#photos`, `#gps`), so the browser's Back button works.
 
 **The Map page** is the exploration map panel, which switches between two views (it starts on the scope):
 
@@ -34,6 +34,22 @@ second); and the newest photo.
 **The Photos page:** every photo the robot has kept, newest first, with a viewer (newer / older, full size,
 download) and a **Delete** button, which deletes it for everyone. Photos can show people near the robot.
 
+**The GPS page:** where the robot really is on Earth, from its GPS.
+
+- **A globe of the Earth** (NASA's Blue Marble), drawn the same way as the Moon globe, with the robot marked on
+  it. It turns to the robot the first time there's a fix; **Center on robot** (or C) turns back to it. Zoom goes
+  to 12×, but the map is 4096 pixels wide (about 10 km a pixel), so close up it shows the region, not the
+  street. Before the first fix it spins, and a note says why there's no marker: no fix yet and how many
+  satellites the GPS hears, the GPS driver not running, or no word from it.
+- **The fix:** latitude and longitude, altitude above sea level, a rough accuracy (HDOP × 2.5 m), speed, heading
+  (only while moving), the satellites used and in view, and the GPS's own time (UTC). The tag says 3D fix, 2D
+  fix, Searching, Stalled or Offline.
+- **The satellites:** a sky plot (north up, the middle straight overhead, the edge the horizon) and each
+  satellite's signal strength. Filled means used for the fix, a ring means heard, dashed means expected but not
+  heard; the list also marks used ones with ✓.
+
+Indoors the GPS usually hears no satellites at all, so the page says so rather than showing a position.
+
 **The remote control**, along the bottom of every page once the robot has answered:
 
 - Hold a button to move: forward and backward, slide left and right (the wheels are mecanum), turn left and
@@ -44,15 +60,15 @@ download) and a **Delete** button, which deletes it for everyone. Photos can sho
   dashboard is driving".
 - The **Robot drive token** box, when the robot has a token set ([setup.md](setup.md#the-drive-token)).
 - What the robot reports back: the four wheel duties (seen from above), the IMU's turn rate and tilt (a bubble
-  level), and whether the LiDAR, motors and IMU are sending.
+  level), and whether the LiDAR, motors, IMU and GPS are sending.
 
 **The Moon globe** button opens a window with a globe of the Moon, drawn by hand on a `<canvas>` (no 3D
-library): for every pixel, `MoonGlobe.jsx` works out which spot on the Moon it shows and copies that spot's
+library): for every pixel, `Globe.jsx` works out which spot on the Moon it shows and copies that spot's
 color from NASA's flat Moon map. Drag to turn it; scroll, pinch, double-click or + / − to zoom (up to 6×;
 the map is only 2048 pixels wide, so close-ups get soft). It turns slowly until touched, unless the device
 asks for reduced motion. It's decoration too: it doesn't show where the robot is.
 
-Until the robot answers, the header says it's connecting, the Camera and Photos pages say they need the
+Until the robot answers, the header says it's connecting, the Camera, Photos and GPS pages say they need the
 robot, and there's no remote control. If the connection drops, the dashboard keeps retrying by itself.
 
 ## Keeping up with the robot
@@ -63,8 +79,8 @@ Firefox on the Pi, the dashboard first managed about half a frame a second; with
 - **No blur and nothing that loops.** The panels are a plain dark tint over the background, without
   `backdrop-filter`: re-blurring the picture behind every panel for each new reading was the main cause.
 - **The fast readings re-draw only what shows them.** LiDAR scans, wheel duties and IMU readings (5–10 a
-  second) are kept outside React's state, and only the scope and the readouts subscribe to them
-  (`useLiveValue` in `src/live/useProwlLink.js`).
+  second), and GPS fixes, are kept outside React's state, and only the scope, the readouts and the GPS page
+  subscribe to them (`useLiveValue` in `src/live/useProwlLink.js`).
 - **The video is pulled one frame at a time** from `/api/camera/frame.jpg`, asking for the next as soon as
   the last one arrives (at most 15 a second), so it's never more than a frame behind however slow the link.
   `vite.config.js` keeps the proxy's connections to the robot open, or every frame would need a new one.
@@ -107,7 +123,7 @@ frontend/
     live/useDrive.js     hold-to-drive: repeats the held command 10 times a second, lets go on release
     live/useNow.js       the clock for the header
     data/backgroundPhoto.js  credit text for the NASA images
-    assets/              the two NASA images (see docs/credits.md)
+    assets/              the three NASA images (see docs/credits.md)
     components/
       MissionHeader.jsx  the top bar and the page tabs
       MobileTabs.jsx     the page tabs on phones
@@ -116,8 +132,10 @@ frontend/
       CameraPanel.jsx    the camera panel on the Map page
       CameraPage.jsx     the live video and Take photo
       PhotosPage.jsx     every photo the robot kept, with a viewer
+      GpsPage.jsx        the Earth globe with the robot on it, the fix, and the satellites
       DriveBar.jsx       the remote control, wheels, IMU and sensor health
-      MoonGlobeWindow.jsx, MoonGlobe.jsx  the Moon globe
+      Globe.jsx          a globe drawn from a flat map, with an optional marker: the Moon's and the Earth's
+      MoonGlobeWindow.jsx  the Moon globe's window
       SectionIcon.jsx    the small line icons, drawn in SVG
 ```
 

@@ -19,7 +19,7 @@ it from the repo root:
   reaches the bridge, and how ROS2 nodes elsewhere on the network can see the robot's topics.
 - `edge/` is mounted at `/ws`, the container's working directory, and the container runs as your user, so
   `build/`, `install/` and `log/` stay owned by you.
-- It gets the sensors' device nodes (`/dev/ttyS0`, `/dev/i2c-1`) and the camera's (`/dev/media*`,
+- It gets the sensors' device nodes (`/dev/ttyS0`, `/dev/ttyAMA4`, `/dev/i2c-1`) and the camera's (`/dev/media*`,
   `/dev/video*`, `/dev/v4l-subdev*`, `/dev/dma_heap/*`), and reads the Pi's udev database, which libcamera
   needs to find the camera. Devices are only passed in when the container is created, so after plugging
   something in, run `./prowl dev down && ./prowl dev up`.
@@ -56,6 +56,7 @@ None of them need the hardware.
 | `prowl_ld19_driver` | The CRC and packet parser against the manual's example packet, packets that cross 0°, corrupted bytes and resyncing, scan assembly, and the conversion to `LaserScan` |
 | `prowl_mpu6050_driver` | Register settings and sample rates, unit conversions, tilt, and the gyro bias check with and without the LiDAR's vibration |
 | `prowl_camera_driver` | JPEG encoding from padded YUV planes (grey levels and colour), bad input, and the timing helpers |
+| `prowl_gps_driver` | NMEA checksums and sentence splitting (starting mid-stream, corrupted and binary bytes), the field formats, GGA, RMC, GSA and GSV against the protocol specification's examples and sentences captured from the receiver, combining them into a fix, and the conversion to `NavSatFix`, `TwistStamped` and `DiagnosticStatus` |
 | `prowl_dashboard_bridge` | The message conversions, the drive gate, the camera feed, the photo store and the HTTP and WebSocket server |
 
 For the dashboard, `npm run lint` and `npm run build` in `frontend/`.
@@ -79,6 +80,7 @@ These come from [CLAUDE.md](../CLAUDE.md), which also has the rules for AI codin
   copied or adapted from existing drivers or examples (for instance LDRobot's `ldlidar_stl_ros2` or
   Adafruit's MPU6050 libraries). Libraries used as they are, such as rclnodejs, React and Vite, are fine.
 - **At most two external APIs** (remote services the code fetches data from). There are none at the moment:
-  the dashboard only talks to the robot, and the NASA images are plain files in the repo.
+  the dashboard only talks to the robot, and the NASA images, including the GPS page's map of the Earth, are
+  plain files in the repo. A street-level map (map tiles from a map service) would be one.
 - **Nothing is pushed to GitHub without the owner's OK**, after seeing the full list of changes.
 - ROS conventions (REP 103): x forward, y left, z up, angles counter-clockwise, metres and radians.
